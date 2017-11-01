@@ -5,8 +5,8 @@ __pycache__/
 
 # Jernej Kos data files
 /Jernej Kos/experiments/models/vae_gan/*
-!/Jernej Kos/experiments/models/vae_gan/__init__.py
-!/Jernej Kos/experiments/models/vae_gan/layers.py
+!/Jernej Kos//experiments/models/vae_gan/__init__.py
+!/Jernej Kos//experiments/models/vae_gan/layers.py
 
 # C extensions
 *.so
