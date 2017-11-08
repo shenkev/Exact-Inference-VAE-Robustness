@@ -10,7 +10,7 @@ class ClassifierBase(ModelBase):
 
     name = None
 
-    def __init__(self, model, num_classes, sample=False):
+    def __init__(self, model, num_classes, sample=False, version=None):
         super(ClassifierBase, self).__init__(model.session, model.batch_size)
 
         self.model = model

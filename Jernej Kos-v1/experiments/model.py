@@ -15,7 +15,7 @@ class ModelBase(object):
     examples_per_epoch = 100
     #examples_per_epoch = 60000
 
-    def __init__(self, session, dataset, batch_size=None):
+    def __init__(self, session, dataset, batch_size=None, version=None):
         assert self.name, 'Each model must define a name attribute.'
 
         self.session = session
@@ -26,6 +26,9 @@ class ModelBase(object):
         self._training = tf.placeholder(tf.bool, [], name='training')
         self._model = tf.make_template('model-{}'.format(self.name), self._build)
         self._train = tf.make_template('train-{}'.format(self.name), self._build_train)
+
+        if version:
+            self.name = self.name + "-" + version
 
     def get_model_filename(self):
         return 'models/{}-{}.weights.tfmod'.format(self.dataset.name, self.name)
@@ -47,7 +50,7 @@ class ModelBase(object):
             filename = self.get_model_filename()
 
         # Transform variable names when loading.
-        if self._model.var_scope.name != self._model._name:
+        if self._model.variable_scope.name != self._model._name:
             variable_map = {}
             for variable in self._get_model_variables():
                 name = variable.name.replace(self._model.var_scope.name, self._model._name)[:-2]
@@ -313,8 +316,8 @@ class GenerativeModelBase(ModelBase):
 
     name = None
 
-    def __init__(self, session, dataset, batch_size=32, latent_dim=50):
-        super(GenerativeModelBase, self).__init__(session, dataset, batch_size)
+    def __init__(self, session, dataset, batch_size=32, latent_dim=50, version=None):
+        super(GenerativeModelBase, self).__init__(session, dataset, batch_size, version)
 
         self.width = dataset.width
         self.height = dataset.height

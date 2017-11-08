@@ -37,6 +37,7 @@ attack_class = getattr(importlib.import_module('experiments.attacks.{}'.format(a
 parser.add_argument('--model-dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=123)
 parser.add_argument('--only-existing', action='store_true')
+parser.add_argument('--version', type=str, default=None)
 parser.add_argument('--ensemble', action='store_true')
 parser.add_argument('--ensemble-size', type=int, default=2)
 parser.add_argument('--ensemble-combination', type=str, choices=['mean', 'majority'], default='mean')
@@ -89,8 +90,10 @@ np.random.seed(args.seed)
 tf.set_random_seed(args.seed)
 
 # Setup reporting.
-report = Report('results/report.txt')
+report_filename = 'report-{}.txt'.format(args.version) if args.version else 'report.txt'
+report = Report('results/' + report_filename)
 report.extend(vars(args))
+report.add("Available GPUs", len(utils.get_available_gpus()))
 
 # Initialize TensorFlow session.
 config = tf.ConfigProto(allow_soft_placement=True)
@@ -130,6 +133,7 @@ test_set, test_set_labels = data_sets.test.images[:128], data_sets.test.labels[:
 model_attributes = {
     'dataset': dataset,
     'latent_dim': args.model_latent_dim[0],
+    'version': args.version
 }
 
 utils.plot_digits(dataset, '{}-originals'.format(dataset.name), test_set, n=10)
@@ -207,10 +211,10 @@ if args.ensemble:
     # Ensure the model variable is not set to detect errors.
     del model
 else:
-    print('Loading model "{}".'.format(model_class.name))
+    print('Loading model class "{}".'.format(model_class.name))
     model = model_class(session, **model_attributes)
 
-    print('Building model.')
+    print('Building model "{}".'.format(model.name))
     model.build()
     model.set_defaults(reconstruction={'sampling': args.model_sample_reconstructions})
 
@@ -303,7 +307,7 @@ if args.ensemble:
     print('Loading ensemble classifiers "{}".'.format(classifier_class.name))
     classifiers = []
     for model in models:
-        classifiers.append(classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample))
+        classifiers.append(classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample), version=args.version)
 
     print('Building classifiers.')
     for classifier in classifiers:
@@ -321,7 +325,7 @@ if args.ensemble:
     classifier.build()
 else:
     print('Loading classifier "{}".'.format(classifier_class.name))
-    classifier = classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample)
+    classifier = classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample, version=args.version)
 
     print('Building classifier.')
     classifier.build()

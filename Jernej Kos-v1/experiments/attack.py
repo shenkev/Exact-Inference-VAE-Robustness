@@ -15,6 +15,9 @@ class AttackBase(object):
         self.classifier = classifier
         self.options = options
 
+        if self.options.version:
+            self.name = self.name + '-' + self.options.version
+
     @classmethod
     def add_options(cls, parser):
         """Augment program arguments."""
