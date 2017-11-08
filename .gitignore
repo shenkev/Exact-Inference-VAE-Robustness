@@ -8,6 +8,12 @@ __pycache__/
 !/Jernej Kos/experiments/models/vae_gan/__init__.py
 !/Jernej Kos/experiments/models/vae_gan/layers.py
 
+/Jernej Kos/models
+/Jernej Kos/results
+/Jernej Kos/.mnist_data
+/Jernej Kos/.faces_data
+
+
 # C extensions
 *.so
 
