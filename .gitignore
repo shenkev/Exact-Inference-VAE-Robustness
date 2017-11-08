@@ -8,6 +8,10 @@ __pycache__/
 !/Jernej Kos/experiments/models/vae_gan/__init__.py
 !/Jernej Kos/experiments/models/vae_gan/layers.py
 
+
+/MNIST_data/
+/out/
+
 # C extensions
 *.so
 
