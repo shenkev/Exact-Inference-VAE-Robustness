@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+import pdb
 
 from .. import classifier
 
@@ -19,9 +20,9 @@ class Classifier(classifier.ClassifierBase):
         z_x = tf.add_n(z_x_sampled) / len(z_x_sampled)
 
         # Classify based on latent space.
-        with slim.arg_scope([slim.fully_connected],
-                            normalizer_fn=slim.batch_norm,
-                            normalizer_params={'is_training': self._training}):
+        with slim.arg_scope([slim.fully_connected]):
+                            # normalizer_fn=slim.batch_norm,
+                            # normalizer_params={'is_training': self._training}):
             # Classify based on latent space.
             fc1 = slim.fully_connected(z_x, 512, activation_fn=tf.nn.relu, scope='fc1')
             fc2 = slim.fully_connected(fc1, 512, activation_fn=tf.nn.relu, scope='fc2')

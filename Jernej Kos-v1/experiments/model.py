@@ -12,7 +12,8 @@ class ModelBase(object):
 
     name = None
     batch_size = 32
-    examples_per_epoch = 60000
+    examples_per_epoch = 100
+    #examples_per_epoch = 60000
 
     def __init__(self, session, dataset, batch_size=None):
         assert self.name, 'Each model must define a name attribute.'
@@ -65,7 +66,7 @@ class ModelBase(object):
 
     def _get_model_variables(self, scope=None, collection=tf.GraphKeys.GLOBAL_VARIABLES):
         """Return all model variables."""
-        model_scope = self._model.var_scope.name
+        model_scope = self._model.variable_scope.name
         if scope is not None:
             model_scope = '{}/{}'.format(model_scope, scope)
         else:
@@ -74,7 +75,7 @@ class ModelBase(object):
 
     def _get_train_variables(self, scope=None):
         """Return all training variables."""
-        train_scope = self._train.var_scope.name
+        train_scope = self._train.variable_scope.name
         if scope is not None:
             train_scope = '{}/{}'.format(train_scope, scope)
         else:

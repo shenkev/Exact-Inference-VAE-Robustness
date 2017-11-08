@@ -81,7 +81,7 @@ class Attack(attack.AttackBase):
         target_batches = []
         for batch in tqdm.trange(total_batch, desc='Batch'):
             # Initialize optimizer.
-            self.session.run(tf.variables_initializer(slim.get_variables(self._attack.var_scope.name)))
+            self.session.run(tf.variables_initializer(slim.get_variables(self._attack.variable_scope.name)))
 
             offset = batch * self.classifier.batch_size
             limit = (batch + 1) * self.classifier.batch_size

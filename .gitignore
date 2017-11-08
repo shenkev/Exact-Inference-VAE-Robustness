@@ -12,6 +12,9 @@ __pycache__/
 /Jernej Kos/results
 /Jernej Kos/.mnist_data
 /Jernej Kos/.faces_data
+/Jernej Kos-v1/models
+/Jernej Kos-v1/results
+/Jernej Kos-v1/.mnist_data
 /tf0to1-master/
 
 # C extensions
