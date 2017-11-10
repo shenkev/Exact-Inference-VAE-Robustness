@@ -17,3 +17,9 @@ def plot(samples):
         plt.imshow(sample.reshape(28, 28), cmap='Greys_r')
 
     return fig
+
+
+def plot_save(samples, name):
+    plot(samples)
+    plt.savefig(name, bbox_inches='tight')
+    plt.close()

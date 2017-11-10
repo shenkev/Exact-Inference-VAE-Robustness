@@ -129,11 +129,11 @@ config = {
     'inference_batch_size': 1,
     'T': 10000,
     'img_dim': 28,
-    'leapfrog_step_size': None,
+    'step_size': None,
     'leapfrog_steps': None,
     'friction': None,
     'z_dim': 100,
-    'likelihood_variance': 0.39
+    'likelihood_variance': 0.38
 }
 
 qz, qz_kept = run_experiment(P, Q, x_gt, config)

@@ -2,7 +2,7 @@ from edward.models import Empirical, Normal
 import edward as ed
 import tensorflow as tf
 
-from util import plot
+from util import plot, plot_save
 import matplotlib.pyplot as plt
 
 
@@ -11,7 +11,7 @@ def build_experiment(P, Q, x_gt, config):
     model = config.get('model')
     T = config.get('T')
     img_dim = config.get('img_dim')
-    leapfrog_step_size = config.get('leapfrog_step_size')
+    step_size = config.get('step_size')
     leapfrog_steps = config.get('leapfrog_steps')
     friction = config.get('friction')
     z_dim = config.get('z_dim')
@@ -27,23 +27,38 @@ def build_experiment(P, Q, x_gt, config):
 
     qz = Empirical(params=tf.Variable(tf.zeros([T, inference_batch_size, z_dim])))
 
+    # ======================= Pick Model and Initialize ======================= #
+
     print ("Using " + str(model) + " model. Beginning inference ...")
 
     if model == 'sghmc':
         inference = ed.SGHMC({z: qz}, data={X: x_gt})
 
+    elif model == 'sgld':
+        inference = ed.SGLD({z: qz}, data={X: x_gt})
+
+    elif model == 'metro':
+        inference = ed.MetropolisHastings({z: qz}, data={X: x_gt})
+
+    elif model == 'gibbs':
+        inference = ed.Gibbs({z: qz}, data={X: x_gt})
+
     else:  # default to hmc
-        print ("Using HMC model. Beginning inference ...")
         inference = ed.HMC({z: qz}, data={X: x_gt})
 
-    if leapfrog_step_size is not None and model == 'sghmc':
-        inference.initialize(step_size=leapfrog_step_size, friction=friction)
+    if step_size is not None and model == 'sghmc':
+        inference.initialize(step_size=step_size, friction=friction)
 
-    elif leapfrog_step_size is not None and model == 'hmc':
-        inference.initialize(step_size=leapfrog_step_size, n_steps=leapfrog_steps)
+    elif step_size is not None and model == 'sgld':
+        inference.initialize(step_size==step_size)
+
+    elif step_size is not None and model == 'hmc':
+        inference.initialize(step_size=step_size, n_steps=leapfrog_steps)
 
     else:
         inference.initialize()
+
+    # =======================                            ======================= #
 
     # load model weights to avoid init_uninited_vars()... or do something else
     init_uninited_vars()
@@ -59,15 +74,17 @@ def run_experiment(P, Q, x_gt, config):
             'inference_batch_size' : 1,
             'T' : hmc_steps,
             'img_dim' : 28,
-            'leapfrog_step_size' : None,
+            'step_size' : None,
             'leapfrog_steps' : None,
             'friction' : None,
             'z_dim' : 100,
             'likelihood_variance' : 0.1
         }
 
-        leapfrog_step_size and leapfrog_steps go together for hmc
-        leapfrog_step_size and friction go together for sghmc
+        step_size and leapfrog_steps go together for hmc
+        step_size and friction go together for sghmc
+        step_size for sgld
+        you can specify dimension ordering for gibbs
     """
 
     hmc_steps = config.get('T')  # how many steps to run hmc for, include burn-in steps
@@ -87,13 +104,15 @@ def run_experiment(P, Q, x_gt, config):
 
     for i in range(sample_to_vis):
         img, _ = P(qz_sample[i])
-        # plot(img.eval())
+        plot_save(img.eval(), './out/mcmc{}.png'.format(str(i).zfill(3)))
+
+    plot_save(x_gt, './out/x_gt.png')
 
     avg_img, _ = P(tf.reduce_mean(qz_sample, 0))
-    plot(avg_img.eval())
-    plt.savefig('./out/hmcMean.png'.format(str(i).zfill(3)), bbox_inches='tight')
+    plot_save(avg_img.eval(), './out/mcmcMean.png')
 
     return qz, qz_kept
+
 
 def compare_vae_hmc_loss(P, Q, x_gt, qz_kept, num_samples=100):
 
@@ -132,10 +151,12 @@ def compare_vae_hmc_loss(P, Q, x_gt, qz_kept, num_samples=100):
     print "---------- Summary ------------"
     print ("VAE recon loss: " + str(recon_loss(x_gt, Q(x_gt)[0], P)))
     print ("VAE L2 loss: " + str(l2_loss(x_gt, Q(x_gt)[0], P)))
-    print ("Best hmc recon loss: " + str(best_recon_loss))
-    print ("Best hmc L2 loss: " + str(best_l2_loss))
-    print ("Average hmc recon loss: " + str(average_recon_loss))
-    print ("Average hmc l2 loss " + str(average_l2_loss))
+    print ("Best mcmc recon loss: " + str(best_recon_loss))
+    print ("Best mcmc L2 loss: " + str(best_l2_loss))
+    print ("Average mcmc recon loss: " + str(average_recon_loss))
+    print ("Average mcmc l2 loss " + str(average_l2_loss))
+    plot_save(P(best_recon_sample)[0].eval(), './out/best_recon.png')
+    plot_save(P(best_l2_sample)[0].eval(), './out/best_l2.png')
 
     return best_recon_sample, best_recon_loss, average_recon_loss, best_l2_sample, best_l2_loss, average_l2_loss
 
