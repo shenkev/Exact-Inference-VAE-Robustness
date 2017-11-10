@@ -2,17 +2,18 @@ from edward.models import Empirical, Normal
 import edward as ed
 import tensorflow as tf
 
+from util import plot
 import matplotlib.pyplot as plt
 
-from util import plot
 
+def build_experiment(P, Q, x_gt, config):
 
-def build_experiment(P, x_gt, config):
-
+    model = config.get('model')
     T = config.get('T')
     img_dim = config.get('img_dim')
-    step_size = config.get('step_size')
-    leap_steps = config.get('leap_steps')
+    leapfrog_step_size = config.get('leapfrog_step_size')
+    leapfrog_steps = config.get('leapfrog_steps')
+    friction = config.get('friction')
     z_dim = config.get('z_dim')
     likelihood_variance = config.get('likelihood_variance')
 
@@ -26,19 +27,31 @@ def build_experiment(P, x_gt, config):
 
     qz = Empirical(params=tf.Variable(tf.zeros([T, inference_batch_size, z_dim])))
 
-    inference = ed.HMC({z: qz}, data={X: x_gt})
+    print ("Using " + str(model) + " model. Beginning inference ...")
 
-    if step_size is not None and leap_steps is not None:
-        inference.initialize(step_size=0.05, n_steps=leap_steps)
+    if model == 'sghmc':
+        inference = ed.SGHMC({z: qz}, data={X: x_gt})
+
+    else:  # default to hmc
+        print ("Using HMC model. Beginning inference ...")
+        inference = ed.HMC({z: qz}, data={X: x_gt})
+
+    if leapfrog_step_size is not None and model == 'sghmc':
+        inference.initialize(step_size=leapfrog_step_size, friction=friction)
+
+    elif leapfrog_step_size is not None and model == 'hmc':
+        inference.initialize(step_size=leapfrog_step_size, n_steps=leapfrog_steps)
+
     else:
         inference.initialize()
 
     # load model weights to avoid init_uninited_vars()... or do something else
     init_uninited_vars()
+
     return inference, qz
 
 
-def run_experiment(P, x_gt, config):
+def run_experiment(P, Q, x_gt, config):
 
     """
         Example configuration
@@ -46,8 +59,8 @@ def run_experiment(P, x_gt, config):
             'inference_batch_size' : 1,
             'T' : hmc_steps,
             'img_dim' : 28,
-            'step_size' : None,
-            'leap_steps' : None,
+            'leapfrog_step_size' : None,
+            'leapfrog_steps' : None,
             'z_dim' : 100,
             'likelihood_variance' : 0.1
         }
@@ -56,7 +69,7 @@ def run_experiment(P, x_gt, config):
     hmc_steps = config.get('T')  # how many steps to run hmc for, include burn-in steps
     keep_ratio = 0.05  # keep only last <keep_ratio> percentage of hmc samples (due to burn-in)
 
-    inference, qz = build_experiment(P, x_gt, config)
+    inference, qz = build_experiment(P, Q, x_gt, config)
 
     for _ in range(hmc_steps):
         info_dict = inference.update()
@@ -70,7 +83,7 @@ def run_experiment(P, x_gt, config):
 
     for i in range(sample_to_vis):
         img, _ = P(qz_sample[i])
-        plot(img.eval())
+        # plot(img.eval())
 
     avg_img, _ = P(tf.reduce_mean(qz_sample, 0))
     plot(avg_img.eval())
@@ -122,16 +135,20 @@ def compare_vae_hmc_loss(P, Q, x_gt, qz_kept, num_samples=100):
 
     return best_recon_sample, best_recon_loss, average_recon_loss, best_l2_sample, best_l2_loss, average_l2_loss
 
+
 def l2_loss(x_gt,z_hmc, P):
     return tf.norm(x_gt-P(z_hmc)[0]).eval()
+
 
 def recon_loss(x_gt,z_hmc, P):
     return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=P(z_hmc)[1], labels=x_gt), 1).eval()
 
+
 def init_uninited_vars():
+    sess = ed.get_session()
     unint_vars = []
     for var in tf.global_variables():
         if not tf.is_variable_initialized(var).eval():
             unint_vars.append(var)
-    missingVarInit = tf.variables_initializer (unint_vars)
+    missingVarInit = tf.variables_initializer(unint_vars)
     sess.run(missingVarInit)

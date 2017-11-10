@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 
 import tensorflow as tf
@@ -8,6 +7,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import edward as ed
 
 from util import plot
+import matplotlib.pyplot as plt
 from mcmc import run_experiment, compare_vae_hmc_loss
 
 mnist = input_data.read_data_sets('./MNIST_data', one_hot=True)
@@ -97,7 +97,7 @@ if not os.path.exists('out/'):
 
 # =============================== TRAINING ====================================
 i = 0
-max_iter = 20000
+max_iter = 8000
 
 for it in range(max_iter):
     X_mb, _ = mnist.train.next_batch(mb_size)
@@ -125,14 +125,16 @@ x_gt, _ = mnist.train.next_batch(inference_batch_size)
 plot(x_gt)
 
 config = {
+    'model': 'hmc',
     'inference_batch_size': 1,
-    'T': 500,
+    'T': 10000,
     'img_dim': 28,
-    'step_size': None,
-    'leap_steps': None,
+    'leapfrog_step_size': None,
+    'leapfrog_steps': None,
+    'friction': None,
     'z_dim': 100,
-    'likelihood_variance': 0.1
+    'likelihood_variance': 0.5
 }
 
-qz, qz_kept = run_experiment(P, x_gt, config)
+qz, qz_kept = run_experiment(P, Q, x_gt, config)
 compare_vae_hmc_loss(P, Q, x_gt, qz_kept, num_samples=100)
