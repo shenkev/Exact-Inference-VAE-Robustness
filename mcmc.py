@@ -61,9 +61,13 @@ def run_experiment(P, Q, x_gt, config):
             'img_dim' : 28,
             'leapfrog_step_size' : None,
             'leapfrog_steps' : None,
+            'friction' : None,
             'z_dim' : 100,
             'likelihood_variance' : 0.1
         }
+
+        leapfrog_step_size and leapfrog_steps go together for hmc
+        leapfrog_step_size and friction go together for sghmc
     """
 
     hmc_steps = config.get('T')  # how many steps to run hmc for, include burn-in steps
