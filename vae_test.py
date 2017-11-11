@@ -1,14 +1,13 @@
-import numpy as np
 import os
 
+import edward as ed
+import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
-import edward as ed
-
-from util import plot
-import matplotlib.pyplot as plt
-from mcmc import run_experiment, compare_vae_hmc_loss
+from mcmc.mcmc import run_experiment, compare_vae_hmc_loss
+from mcmc.util import plot
 
 mnist = input_data.read_data_sets('./MNIST_data', one_hot=True)
 mb_size = 64
