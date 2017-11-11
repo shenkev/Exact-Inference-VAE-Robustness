@@ -96,7 +96,7 @@ if not os.path.exists('out/'):
 
 # =============================== TRAINING ====================================
 i = 0
-max_iter = 8000
+max_iter = 15000
 
 for it in range(max_iter):
     X_mb, _ = mnist.train.next_batch(mb_size)
@@ -132,7 +132,7 @@ config = {
     'leapfrog_steps': None,
     'friction': None,
     'z_dim': 100,
-    'likelihood_variance': 0.38
+    'likelihood_variance': 0.4
 }
 
 qz, qz_kept = run_experiment(P, Q, x_gt, config)
