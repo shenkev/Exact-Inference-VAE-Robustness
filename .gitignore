@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+/models
+/results
+.mnist_data/
+
 .idea/
 test.py
 models/
