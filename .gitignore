@@ -3,10 +3,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+/models
+/results
+.mnist_data/
+
+.idea/
+test.py
+models/
+
 # Jernej Kos data files
 /Jernej Kos/experiments/models/vae_gan/*
 !/Jernej Kos/experiments/models/vae_gan/__init__.py
 !/Jernej Kos/experiments/models/vae_gan/layers.py
+
 
 /Jernej Kos/models
 /Jernej Kos/results
@@ -16,6 +25,13 @@ __pycache__/
 /Jernej Kos-v1/results
 /Jernej Kos-v1/.mnist_data
 /tf0to1-master/
+
+Untitled.ipynb
+Untitled1.ipynb
+
+/MNIST_data/
+/out/
+
 
 # C extensions
 *.so
