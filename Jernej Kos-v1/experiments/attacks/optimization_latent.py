@@ -16,7 +16,7 @@ class Attack(OptimizationAttack):
         """Augment program arguments."""
         super(Attack, cls).add_options(parser)
 
-        parser.add_argument('--attack-target', type=int, default=9,
+        parser.add_argument('--attack-target', type=int, default=7,
                             help='Target class for targeted attack')
         parser.add_argument('--attack-mode', type=str, choices=['mean', 'random', 'index', 'untargeted'],
                             default='mean')

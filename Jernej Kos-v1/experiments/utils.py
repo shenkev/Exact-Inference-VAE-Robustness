@@ -185,7 +185,7 @@ def plot_digits(dataset, name, data, n=3, figure_size=6, labels=None):
     plt.axis('off')
     plt.tight_layout()
     plt.savefig('results/{}.png'.format(name), bbox_inches='tight', pad_inches=0)
-    plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0)
+    #plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0)
     plt.close()
 
 
@@ -397,7 +397,7 @@ def plot_adversarial_digits(name, dataset, model,
     plt.axis('off')
     plt.tight_layout()
     plt.savefig('results/{}.png'.format(name), bbox_inches='tight', pad_inches=0, dpi=dpi)
-    plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0, dpi=dpi)
+    #plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0, dpi=dpi)
     plt.close()
 
 
@@ -490,5 +490,5 @@ def plot_latent_space(name, models, count=1000, adversarial=None):
     plt.xlim(0, 1.0)
     plt.ylim(0, 1.0)
     plt.savefig('results/{}.png'.format(name), bbox_inches='tight', pad_inches=0)
-    plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0)
+    #plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0)
     plt.close()

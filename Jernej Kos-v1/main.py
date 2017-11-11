@@ -5,6 +5,7 @@ import random
 import argparse
 import importlib
 import matplotlib
+import pickle
 
 import numpy as np
 import tensorflow as tf
@@ -65,7 +66,8 @@ parser.add_argument('--classifier-checkpoint-every', type=int, default=10)
 parser.add_argument('--classifier-sample', action='store_true')
 
 # Attack options.
-parser.add_argument('--attack-randomize-model', action='store_true')
+parser.add_argument('--attack-generate-examples', action='store_true')
+parser.add_argument('--attack-examples-path', type=str, default=None)
 parser.add_argument('--attack-set-size', type=int, default=1000)
 parser.add_argument('--attack-reconstruct-loops', type=int, default=2)
 attack_class.add_options(parser)
@@ -138,227 +140,123 @@ model_attributes = {
 
 utils.plot_digits(dataset, '{}-originals'.format(dataset.name), test_set, n=10)
 
-# Load models.
-if args.ensemble:
-    print('Loading ensemble models "{}".'.format(model_class.name))
-    models = []
-    for index in xrange(args.ensemble_size):
-        if len(args.model_latent_dim) > 1:
-            try:
-                model_attributes.update({'latent_dim': args.model_latent_dim[index]})
-            except IndexError:
-                print('ERROR: For ensemble you need to pass --model-latent-dim for each model.')
-                exit(1)
+# Load Model
+print('Loading model class "{}".'.format(model_class.name))
+model = model_class(session, **model_attributes)
 
-        models.append(model_class(session, **model_attributes))
+print('Building model "{}".'.format(model.name))
+model.build()
+model.set_defaults(reconstruction={'sampling': args.model_sample_reconstructions})
 
-    print('Building models.')
-    for model in models:
-        model.build()
-        model.set_defaults(reconstruction={'sampling': args.model_sample_reconstructions})
+checkpoint = os.path.join(args.model_dir, '{}-{}.weights.tfmod'.format(dataset.name, model.name))
 
-    print('Loading pre-trained models.')
-    for index, model in enumerate(models):
-        checkpoint = os.path.join(args.model_dir, 'ensemble', str(index),
-                                  '{}-{}.weights.tfmod'.format(dataset.name, model.name))
-        model.load(checkpoint)
+if args.model_resume or args.only_existing:
+    print('Loading pre-trained model.')
+    model.load(checkpoint)
 
-    # Plot reconstructions.
-    print('Reconstructing inputs.')
-    with report.add_time_block('time_model_reconstruct_originals'):
-        for index, model in enumerate(models):
-            original_reconstructions = model.reconstruct(test_set)
-            if np.isnan(original_reconstructions).any():
-                print('ERROR: Model produced NaN values for reconstructions.')
-                exit(1)
+if args.model_train and not args.only_existing:
+    print('Training the model.')
+    with report.add_time_block('time_model_train'):
+        model.train(
+            data_sets,
+            epochs=args.model_train_epochs,
+            checkpoint=checkpoint,
+            checkpoint_every=args.model_checkpoint_every,
+        )
 
-            utils.plot_digits(dataset, '{}-{}-ensemble-{}-reconstructions'.format(dataset.name, model.name, index),
-                              original_reconstructions, n=10)
+# Plot reconstructions.
+print('Reconstructing inputs.')
+with report.add_time_block('time_model_reconstruct_originals'):
+    original_reconstructions = model.reconstruct(test_set)
+    if np.isnan(original_reconstructions).any():
+        print('ERROR: Model produced NaN values for reconstructions.')
+        exit(1)
 
-    # Plot latent space.
-    if args.model_latent_visualization:
-        print('Plotting latent space.')
-        with report.add_time_block('time_model_plot_latent_space'):
-            utils.plot_latent_space('{}-ensemble-latent-space'.format(dataset.name), models, 1000)
+utils.plot_digits(dataset, '{}-{}-reconstructions'.format(dataset.name, model.name),
+                  original_reconstructions, n=10)
 
-    if args.model_latent_distances:
-        # Compute distances between different pairs of classes in latent space.
-        print('Distances between different pairs of classes in latent space.')
-        model_a, model_b = models[0], models[2]
+# Plot latent space.
+if args.model_latent_visualization:
+    print('Plotting latent space.')
+    with report.add_time_block('time_model_plot_latent_space'):
+        utils.plot_latent_space('{}-{}-latent-space'.format(dataset.name, model.name), [model], 1000)
 
-        labels = data_sets.test.labels
-        latent_model_a = model_a.encode(data_sets.test.images)
-        latent_model_b = model_b.encode(data_sets.test.images)
-        for a in xrange(dataset.class_count):
-            only_a = latent_model_a[labels == a]
-            values = []
-            for b in xrange(dataset.class_count):
-                only_b = latent_model_b[labels == b]
-                count = min(only_a.shape[0], only_b.shape[0])
+    # Plot reconstruction of class means.
+    means = []
+    mean_decodings = []
+    for label in xrange(dataset.class_count):
+        latent = model.encode(data_sets.test.images[data_sets.test.labels == label])
+        mean = np.mean(latent, axis=0).reshape([1, -1])
+        decoding = model.decode(np.tile(mean, [model.batch_size, 1]))
+        means.append(mean)
+        mean_decodings.append(decoding[0])
 
-                distances = []
-                for latent_a in only_a:
-                    for latent_b in only_b:
-                        distances.append(np.linalg.norm(latent_a - latent_b))
+    utils.plot_digits(dataset, '{}-{}-latent-means'.format(dataset.name, model.name),
+                      np.asarray(mean_decodings), n=dataset.class_count)
 
-                values.append('"{0:.2f} ({1:.2f})"'.format(
-                    np.mean(distances),
-                    np.std(distances),
-                ))
+    # Plot morphing one class into another.
+    def morph(a, b, steps=10):
+        latent_a = means[a]
+        latent_b = means[b]
+        interpolations = []
+        for i in xrange(steps + 1):
+            interpolation = latent_a + (latent_b - latent_a) * float(i) / steps
+            interpolations.append(model.decode(np.tile(interpolation, [model.batch_size, 1]))[0])
+        return np.asarray(interpolations)
 
-            print(a, ' '.join(values))
+    for a, b in [(0, 1), (1, 2)]:
+        utils.plot_digits(dataset, '{}-{}-morph-{}-{}'.format(dataset.name, model.name, a, b),
+                          morph(a, b, steps=100), n=10)
 
-    # Ensure the model variable is not set to detect errors.
-    del model
-else:
-    print('Loading model class "{}".'.format(model_class.name))
-    model = model_class(session, **model_attributes)
+if args.model_latent_distances:
+    # Compute distances between different pairs of classes in latent space.
+    print('Distances between different pairs of classes in latent space.')
+    labels = data_sets.test.labels
+    latent = model.encode(data_sets.test.images)
+    for a in xrange(dataset.class_count):
+        only_a = latent[labels == a]
+        values = []
+        for b in xrange(a + 1):
+            only_b = latent[labels == b]
+            count = min(only_a.shape[0], only_b.shape[0])
 
-    print('Building model "{}".'.format(model.name))
-    model.build()
-    model.set_defaults(reconstruction={'sampling': args.model_sample_reconstructions})
+            distances = []
+            for latent_a in only_a:
+                for latent_b in only_b:
+                    distances.append(np.linalg.norm(latent_a - latent_b))
 
-    checkpoint = os.path.join(args.model_dir, '{}-{}.weights.tfmod'.format(dataset.name, model.name))
+            values.append('"{0:.2f} ({1:.2f})"'.format(
+                np.mean(distances),
+                np.std(distances),
+            ))
 
-    if args.model_resume or args.only_existing:
-        print('Loading pre-trained model.')
-        model.load(checkpoint)
-
-    if args.model_train and not args.only_existing:
-        print('Training the model.')
-        with report.add_time_block('time_model_train'):
-            model.train(
-                data_sets,
-                epochs=args.model_train_epochs,
-                checkpoint=checkpoint,
-                checkpoint_every=args.model_checkpoint_every,
-            )
-
-    # Plot reconstructions.
-    print('Reconstructing inputs.')
-    with report.add_time_block('time_model_reconstruct_originals'):
-        original_reconstructions = model.reconstruct(test_set)
-        if np.isnan(original_reconstructions).any():
-            print('ERROR: Model produced NaN values for reconstructions.')
-            exit(1)
-
-    utils.plot_digits(dataset, '{}-{}-reconstructions'.format(dataset.name, model.name),
-                      original_reconstructions, n=10)
-
-    # Plot latent space.
-    if args.model_latent_visualization:
-        print('Plotting latent space.')
-        with report.add_time_block('time_model_plot_latent_space'):
-            utils.plot_latent_space('{}-{}-latent-space'.format(dataset.name, model.name), [model], 1000)
-
-        # Plot reconstruction of class means.
-        means = []
-        mean_decodings = []
-        for label in xrange(dataset.class_count):
-            latent = model.encode(data_sets.test.images[data_sets.test.labels == label])
-            mean = np.mean(latent, axis=0).reshape([1, -1])
-            decoding = model.decode(np.tile(mean, [model.batch_size, 1]))
-            means.append(mean)
-            mean_decodings.append(decoding[0])
-
-        utils.plot_digits(dataset, '{}-{}-latent-means'.format(dataset.name, model.name),
-                          np.asarray(mean_decodings), n=dataset.class_count)
-
-        # Plot morphing one class into another.
-        def morph(a, b, steps=10):
-            latent_a = means[a]
-            latent_b = means[b]
-            interpolations = []
-            for i in xrange(steps + 1):
-                interpolation = latent_a + (latent_b - latent_a) * float(i) / steps
-                interpolations.append(model.decode(np.tile(interpolation, [model.batch_size, 1]))[0])
-            return np.asarray(interpolations)
-
-        for a, b in [(0, 1), (1, 2)]:
-            utils.plot_digits(dataset, '{}-{}-morph-{}-{}'.format(dataset.name, model.name, a, b),
-                              morph(a, b, steps=100), n=10)
-
-    if args.model_latent_distances:
-        # Compute distances between different pairs of classes in latent space.
-        print('Distances between different pairs of classes in latent space.')
-        labels = data_sets.test.labels
-        latent = model.encode(data_sets.test.images)
-        for a in xrange(dataset.class_count):
-            only_a = latent[labels == a]
-            values = []
-            for b in xrange(a + 1):
-                only_b = latent[labels == b]
-                count = min(only_a.shape[0], only_b.shape[0])
-
-                distances = []
-                for latent_a in only_a:
-                    for latent_b in only_b:
-                        distances.append(np.linalg.norm(latent_a - latent_b))
-
-                values.append('"{0:.2f} ({1:.2f})"'.format(
-                    np.mean(distances),
-                    np.std(distances),
-                ))
-
-            print(a, ' '.join(values))
+        print(a, ' '.join(values))
 
 # Load classifier.
-if args.ensemble:
-    print('Loading ensemble classifiers "{}".'.format(classifier_class.name))
-    classifiers = []
-    for model in models:
-        classifiers.append(classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample), version=args.version)
-
-    print('Building classifiers.')
-    for classifier in classifiers:
-        classifier.build()
-
-    print('Loading pre-trained classifiers.')
-    for index, classifier in enumerate(classifiers):
-        checkpoint = os.path.join(args.model_dir, 'ensemble', str(index),
-                                  '{}-{}-{}.weights.tfmod'.format(
-                                      dataset.name, classifier.name, classifier.model.name))
-        classifier.load(checkpoint)
-
-    print('Building classifier ensemble.')
-    classifier = EnsembleClassifier(classifiers, combination=args.ensemble_combination)
-    classifier.build()
-else:
-    print('Loading classifier "{}".'.format(classifier_class.name))
-    classifier = classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample, version=args.version)
-
-    print('Building classifier.')
-    classifier.build()
-
-    checkpoint = os.path.join(args.model_dir,
-                              '{}-{}-{}.weights.tfmod'.format(dataset.name, classifier.name, model.name))
-
-    if args.classifier_resume or args.only_existing:
-        print('Loading pre-trained classifier.')
-        classifier.load(checkpoint)
-
-    if args.classifier_train and not args.only_existing:
-        print('Training the classifier.')
-        with report.add_time_block('time_classifier_train'):
-            classifier.train(
-                data_sets,
-                epochs=args.classifier_train_epochs,
-                checkpoint=checkpoint,
-                checkpoint_every=args.classifier_checkpoint_every,
-            )
+print('Loading classifier "{}".'.format(classifier_class.name))
+classifier = classifier_class(model, num_classes=data_set_label_count, sample=args.classifier_sample, version=args.version)
+print('Building classifier.')
+classifier.build()
+checkpoint = os.path.join(args.model_dir,
+                          '{}-{}-{}.weights.tfmod'.format(dataset.name, classifier.name, model.name))
+if args.classifier_resume or args.only_existing:
+    print('Loading pre-trained classifier.')
+    classifier.load(checkpoint)
+if args.classifier_train and not args.only_existing:
+    print('Training the classifier.')
+    with report.add_time_block('time_classifier_train'):
+        classifier.train(
+            data_sets,
+            epochs=args.classifier_train_epochs,
+            checkpoint=checkpoint,
+            checkpoint_every=args.classifier_checkpoint_every,
+        )
 
 print('Evaluating classifier.')
 with report.add_time_block('time_classifier_evaluate'):
     accuracy = classifier.evaluate(data_sets.test.images, data_sets.test.labels)
 print('Classifier accuracy:', accuracy)
 report.add('classifier_accuracy', accuracy)
-
-if args.ensemble:
-    with report.add_time_block('time_subclassifier_evaluate'):
-        for index, subclassifier in enumerate(classifiers):
-            accuracy = subclassifier.evaluate(data_sets.test.images, data_sets.test.labels)
-            print('Subclassifier {} accuracy:'.format(index), accuracy)
-            report.add('subclassifier_{}_accuracy'.format(index), accuracy)
 
 predictions = classifier.predict(data_sets.test.images)
 for label, correct, count, accuracy, _ in utils.accuracy_combinations(
@@ -371,74 +269,50 @@ for label, correct, count, accuracy, _ in utils.accuracy_combinations(
 
 # Load attack.
 print('Loading attack "{}".'.format(args.attack))
-if args.ensemble:
-    attack = attack_class(models[0], classifier, args)
+attack = attack_class(model, classifier, args) # Bad Hack - sorry
+if args.attack_generate_examples:
+    print('Generating adversarial examples.')
+    attack_set = utils.clip_to_batch_size(model_class, data_sets.test.images[:args.attack_set_size])
+    attack_set_labels = utils.clip_to_batch_size(model_class, data_sets.test.labels[:args.attack_set_size])
+    print('Attacking first {} examples from the test set.'.format(attack_set.shape[0]))
+    
+    with report.add_time_block('time_attack_generate'):
+        adversarial_examples, adversarial_targets = attack.adversarial_examples(attack_set, attack_set_labels)
+    
+    if np.isnan(adversarial_examples).any():
+        print('ERROR: Attack produced adversarial examples with NaN values!')
+        exit(1)
+
+    f = open('adversarial_examples_{}.pckl'.format(args.version), 'wb')
+    pickle.dump([attack_set, attack_set_labels, adversarial_examples, adversarial_targets], f)
+    f.close()
 else:
-    attack = attack_class(model, classifier, args)
+    f = open(args.attack_examples_path, 'rb')
+    attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
+    f.close()
 
-print('Generating adversarial examples.')
-attack_set = utils.clip_to_batch_size(model_class, data_sets.test.images[:args.attack_set_size])
-attack_set_labels = utils.clip_to_batch_size(model_class, data_sets.test.labels[:args.attack_set_size])
-print('Attacking first {} examples from the test set.'.format(attack_set.shape[0]))
 
-if args.attack_randomize_model:
-    # Randomize model weights before generating adversarial examples.
-    print('Randomizing model weights.')
-    variables = model._get_model_variables()
-    stored_variables = {}
-    assign_ops = []
-    for variable in variables:
-        value = session.run(variable)
-        stored_variables[variable] = value
-        print('Weights "{}" ({}) range: min={} max={} std={} mean={}'.format(
-            variable.name, value.shape, np.min(value), np.max(value), np.std(value), np.mean(value)))
-        new_value = np.random.normal(np.mean(value), max(1e-3, np.std(value)), value.shape)
-        print('Weights "{}" ({}) new range: min={} max={} std={} mean={}'.format(
-            variable.name, new_value.shape, np.min(new_value), np.max(new_value), np.std(value), np.mean(new_value)))
-        assign_ops.append(variable.assign(new_value))
-    session.run(assign_ops)
+# target_examples = attack.get_target_examples()
+# if target_examples is not None:
+#     target_reconstruction, target_source = target_examples
 
-    # Reconstruct original inputs using the randomized model.
-    random_reconstructions = model.reconstruct(attack_set)
-    utils.plot_digits(dataset, '{}-reconstructions-randomized'.format(dataset.name), random_reconstructions, n=10)
+#     utils.plot_digits(
+#         dataset,
+#         '{}-{}-{}-{}-target-reconstruction'.format(dataset.name, model.name, classifier.name, attack.name),
+#         target_reconstruction,
+#         n=1
+#     )
 
-with report.add_time_block('time_attack_generate'):
-    adversarial_examples, adversarial_targets = attack.adversarial_examples(attack_set, attack_set_labels)
-
-target_examples = attack.get_target_examples()
-if target_examples is not None:
-    target_reconstruction, target_source = target_examples
-
-    utils.plot_digits(
-        dataset,
-        '{}-{}-{}-{}-target-reconstruction'.format(dataset.name, model.name, classifier.name, attack.name),
-        target_reconstruction,
-        n=1
-    )
-
-    utils.plot_digits(
-        dataset,
-        '{}-{}-{}-{}-target-source'.format(dataset.name, model.name, classifier.name, attack.name),
-        target_source,
-        n=1
-    )
-
-if np.isnan(adversarial_examples).any():
-    print('ERROR: Attack produced adversarial examples with NaN values!')
-    exit(1)
-
-if args.attack_randomize_model:
-    # Restore model weights.
-    print('Restoring model weights.')
-    assign_ops = []
-    for variable, value in stored_variables.items():
-        assign_ops.append(variable.assign(value))
-    session.run(assign_ops)
+#     utils.plot_digits(
+#         dataset,
+#         '{}-{}-{}-{}-target-source'.format(dataset.name, model.name, classifier.name, attack.name),
+#         target_source,
+#         n=1
+#     )
 
 predictions = classifier.predict(adversarial_examples)
 
 print('Distances between adversarial examples and original images.')
-
 
 def compute_distances(name, difference):
     distances = {
@@ -608,75 +482,7 @@ def reconstruction_loops(model, index=None):
     return result
 
 results = {}
-if args.ensemble:
-    for index, model in enumerate(models):
-        results[index] = reconstruction_loops(model, index=index)
-
-    # Compute the accuracy of the majority classifier based on individual reconstructions.
-    for loop in xrange(args.attack_reconstruct_loops):
-        model_predictions = np.stack([
-            results[index][loop]['model_predictions']
-            for index in xrange(len(models))
-        ]).transpose()
-
-        model_predictions = np.asarray([
-            np.argmax(np.bincount(row))
-            for row in model_predictions
-        ])
-
-        if attack.targeted:
-            filtered_model_predictions = model_predictions[different_target_indices]
-        else:
-            filtered_model_predictions = model_predictions
-
-        accuracy = np.mean(filtered_model_predictions == filtered_labels)
-        correct = np.sum(filtered_model_predictions == filtered_labels)
-        count = filtered_labels.shape[0]
-
-        print('Loop', loop + 1)
-        print('Classifier accuracy on majority reconstructed adversarial examples: {}/{} ({})'.format(
-              correct, count, accuracy))
-
-        report.add('loop{}_majority_correct'.format(loop + 1), correct)
-        report.add('loop{}_majority_accuracy'.format(loop + 1), accuracy)
-
-        for src_class, correct, count, accuracy, matching_rate in utils.accuracy_combinations(
-                dataset, filtered_labels, filtered_model_predictions, filtered_targets):
-            print('[{}] Classifier accuracy on adversarial examples (class={}): {}/{} ({})'.format(
-                  index, src_class, correct, count, accuracy))
-            report.add('loop{}_majority_src{}_correct'.format(loop + 1, src_class), correct)
-            report.add('loop{}_majority_src{}_count'.format(loop + 1, src_class), count)
-            report.add('loop{}_majority_src{}_accuracy'.format(loop + 1, src_class), accuracy)
-            report.add('loop{}_majority_src{}_matching_rate'.format(loop + 1, src_class), matching_rate)
-
-    # Perform cross-reconstructions.
-    if args.ensemble_cross_reconstruct:
-        print('Cross-reconstructions.')
-        reconstructions = adversarial_examples
-        for index, model in enumerate(models):
-            print(adversarial_examples)
-            reconstructions = model.reconstruct(utils.crop_for_model(model, reconstructions))
-            predictions = classifier.predict(utils.crop_for_model(model, reconstructions))
-
-            if attack.targeted:
-                filtered_predictions = predictions[different_target_indices]
-            else:
-                filtered_predictions = predictions
-
-            incorrect_indices = (filtered_predictions != filtered_labels)
-            correct = np.sum(filtered_predictions == filtered_labels)
-            count = filtered_labels.shape[0]
-            accuracy = np.mean(filtered_predictions == filtered_labels)
-
-            print('Model', index + 1)
-            print('[{}] Classifier accuracy: {}/{} ({})'.format(index, correct, count, accuracy))
-
-            if attack.targeted:
-                incorrect, matching, rate = utils.get_matching_rate(
-                    filtered_labels, filtered_predictions, filtered_targets)
-                print('[{}] Targeted attack matching rate: {}/{} ({})'.format(index, matching, incorrect, rate))
-else:
-    results[0] = reconstruction_loops(model)
+results[0] = reconstruction_loops(model)
 
 # Generate plots.
 predictions_loop1 = results[0][0]['predictions']
@@ -689,10 +495,7 @@ if attack.targeted:
 else:
     indices_notarget = None
 
-if args.ensemble:
-    prefix = '{}-{}-{}-{}'.format(dataset.name, models[0].name, classifier.name, attack.name)
-else:
-    prefix = '{}-{}-{}-{}'.format(dataset.name, model.name, classifier.name, attack.name)
+prefix = '{}-{}-{}-{}'.format(dataset.name, model.name, classifier.name, attack.name)
 
 attack_set_reconstructions = model.reconstruct(attack_set)
 attack_set_reconstructions_sample_1 = model.reconstruct(attack_set, sample=True, sample_times=1)

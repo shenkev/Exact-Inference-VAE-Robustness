@@ -12,8 +12,8 @@ class ModelBase(object):
 
     name = None
     batch_size = 32
-    examples_per_epoch = 100
-    #examples_per_epoch = 60000
+    #examples_per_epoch = 100
+    examples_per_epoch = 60000
 
     def __init__(self, session, dataset, batch_size=None, version=None):
         assert self.name, 'Each model must define a name attribute.'
