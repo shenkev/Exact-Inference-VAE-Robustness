@@ -68,9 +68,9 @@ x_gt, _ = mnist_dataset.test.next_batch(inference_batch_size)
 plot(x_gt)
 
 config = {
-    'model': 'hmc',
+    'model': 'sgld',
     'inference_batch_size': 1,
-    'T': 1000,
+    'T': 5000,
     'img_dim': 28,
     'step_size': None,
     'leapfrog_steps': None,
@@ -80,6 +80,7 @@ config = {
 }
 
 # Hack this shit
+tf.logging.set_verbosity(tf.logging.ERROR)
 model._training = tf.constant([False])
 qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_gt, config)
-# compare_vae_hmc_loss(model.decode_op, model.encode_op, x_gt, qz_kept, num_samples=100)
+compare_vae_hmc_loss(model.decode_op, model.encode_op, x_gt, qz_kept, num_samples=100)

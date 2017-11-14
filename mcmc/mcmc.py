@@ -110,7 +110,7 @@ def run_experiment(P, Q, x_gt, config):
         img = P(qz_sample[i])[0]
         workaround = True
         if workaround:
-            img = tf.expand_dims(tf.reshape(tf.slice(tf.reshape(img, [32, 32]), [2, 2], [28, 28]), [784, ]), 0)
+            img = tf.reshape(tf.slice(tf.reshape(img, [32, 32]), [2, 2], [28, 28]), [1, 784])
         plot_save(img.eval(), './out/mcmc{}.png'.format(str(i).zfill(3)))
 
     plot_save(x_gt, './out/x_gt.png')
@@ -118,7 +118,7 @@ def run_experiment(P, Q, x_gt, config):
     avg_img = P(tf.reduce_mean(qz_sample, 0))[0]
     workaround = True
     if workaround:
-        avg_img = tf.expand_dims(tf.reshape(tf.slice(tf.reshape(avg_img, [32, 32]), [2, 2], [28, 28]), [784, ]), 0)
+        avg_img = tf.reshape(tf.slice(tf.reshape(avg_img, [32, 32]), [2, 2], [28, 28]), [1, 784])
     plot_save(avg_img.eval(), './out/mcmcMean.png')
 
     return qz, qz_kept
@@ -136,7 +136,7 @@ def compare_vae_hmc_loss(P, Q, x_gt, qz_kept, num_samples=100):
     total_recon_loss = 0.0
     total_l2_loss = 0.0
 
-    for sample in samples_to_check:
+    for i, sample in enumerate(samples_to_check):
 
         r_loss = recon_loss(x_gt, sample, P)
         l_loss = l2_loss(x_gt, sample, P)
@@ -153,30 +153,51 @@ def compare_vae_hmc_loss(P, Q, x_gt, qz_kept, num_samples=100):
 
         print ("Recon loss: " + str(r_loss))
         print ("L2 loss: " + str(l_loss))
-        print "-------------"
+        print "------------- Evaluating {}/{} --------------".format(i+1, num_samples)
 
     average_recon_loss = total_recon_loss/num_samples
     average_l2_loss = total_l2_loss/num_samples
 
     print "---------- Summary ------------"
-    print ("VAE recon loss: " + str(recon_loss(x_gt, Q(x_gt)[0], P)))
-    print ("VAE L2 loss: " + str(l2_loss(x_gt, Q(x_gt)[0], P)))
+    workaround = True
+    if workaround:
+        print ("VAE recon loss: " + str(recon_loss(x_gt, Q(x_gt), P)))
+        print ("VAE L2 loss: " + str(l2_loss(x_gt, Q(x_gt), P)))
+    else:
+        print ("VAE recon loss: " + str(recon_loss(x_gt, Q(x_gt)[0], P)))
+        print ("VAE L2 loss: " + str(l2_loss(x_gt, Q(x_gt)[0], P)))
+
     print ("Best mcmc recon loss: " + str(best_recon_loss))
     print ("Best mcmc L2 loss: " + str(best_l2_loss))
     print ("Average mcmc recon loss: " + str(average_recon_loss))
     print ("Average mcmc l2 loss " + str(average_l2_loss))
-    plot_save(P(best_recon_sample)[0].eval(), './out/best_recon.png')
-    plot_save(P(best_l2_sample)[0].eval(), './out/best_l2.png')
+    if workaround:
+        plot_save(tf.reshape(tf.slice(tf.reshape(P(Q(x_gt)), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(), './out/vae_recon.png')
+        plot_save(tf.reshape(tf.slice(tf.reshape(P(best_recon_sample), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(), './out/best_recon.png')
+        plot_save(tf.reshape(tf.slice(tf.reshape(P(best_l2_sample), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(), './out/best_l2.png')
+    else:
+        plot_save(P(Q(x_gt)[0])[0].eval(), './out/vae_recon.png')
+        plot_save(P(best_recon_sample)[0].eval(), './out/best_recon.png')
+        plot_save(P(best_l2_sample)[0].eval(), './out/best_l2.png')
 
     return best_recon_sample, best_recon_loss, average_recon_loss, best_l2_sample, best_l2_loss, average_l2_loss
 
 
 def l2_loss(x_gt,z_hmc, P):
-    return tf.norm(x_gt-P(z_hmc)[0]).eval()
+    workaround = True
+    if workaround:
+        return tf.norm(x_gt - tf.reshape(tf.slice(tf.reshape(P(z_hmc), [32, 32]), [2, 2], [28, 28]), [1, 784])).eval()
+    else:
+        return tf.norm(x_gt-P(z_hmc)[0]).eval()
 
 
 def recon_loss(x_gt,z_hmc, P):
-    return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=P(z_hmc)[1], labels=x_gt), 1).eval()
+    workaround = True
+    if workaround:
+        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=tf.reshape(tf.slice(tf.reshape(P(z_hmc), [32, 32]), [2, 2], [28, 28]), [1, 784]), labels=x_gt), 1).eval()
+    else:
+        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=P(z_hmc)[1], labels=x_gt), 1).eval()
 
 
 def init_uninited_vars():
