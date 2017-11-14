@@ -21,7 +21,11 @@ def build_experiment(P, Q, x_gt, config):
 
     z = Normal(loc=tf.zeros([inference_batch_size, z_dim]), scale=tf.ones([inference_batch_size, z_dim]))  # sample z
 
-    normalized_dec_x, dec_x_logits = P(z)
+    normalized_dec_x = P(z)[0]
+
+    work_around = True
+    if work_around:
+        normalized_dec_x = tf.reshape(tf.slice(tf.reshape(normalized_dec_x, [32, 32]), [2, 2], [img_dim, img_dim]), [784,])
 
     X = Normal(loc=normalized_dec_x, scale=likelihood_variance*tf.ones([inference_batch_size, img_dim * img_dim]))
 
@@ -73,7 +77,7 @@ def run_experiment(P, Q, x_gt, config):
             config = {
             'inference_batch_size' : 1,
             'T' : hmc_steps,
-            'img_dim' : 28,
+            'img_dim' : 32,
             'step_size' : None,
             'leapfrog_steps' : None,
             'friction' : None,
@@ -103,12 +107,18 @@ def run_experiment(P, Q, x_gt, config):
     qz_sample = qz_kept.sample(sample_to_vis)
 
     for i in range(sample_to_vis):
-        img, _ = P(qz_sample[i])
+        img = P(qz_sample[i])[0]
+        workaround = True
+        if workaround:
+            img = tf.expand_dims(tf.reshape(tf.slice(tf.reshape(img, [32, 32]), [2, 2], [28, 28]), [784, ]), 0)
         plot_save(img.eval(), './out/mcmc{}.png'.format(str(i).zfill(3)))
 
     plot_save(x_gt, './out/x_gt.png')
 
-    avg_img, _ = P(tf.reduce_mean(qz_sample, 0))
+    avg_img = P(tf.reduce_mean(qz_sample, 0))[0]
+    workaround = True
+    if workaround:
+        avg_img = tf.expand_dims(tf.reshape(tf.slice(tf.reshape(avg_img, [32, 32]), [2, 2], [28, 28]), [784, ]), 0)
     plot_save(avg_img.eval(), './out/mcmcMean.png')
 
     return qz, qz_kept
