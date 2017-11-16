@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import edward as ed
+import pickle
 
 # this is kind of hacky, model_class is the vae_gan class but its parent abstract-class is in the same folder
 from stolen_jernej_code_vae_gan import Model as model_class, utils
@@ -8,7 +9,7 @@ from stolen_jernej_code_vae_gan.mnist import mnist_data
 from stolen_jernej_code_vae_gan.report import Report
 import stolen_jernej_code_vae_gan.other_util_plotting as util2
 
-from mcmc.util import plot
+from mcmc.util import plot, plot_save
 from mcmc.mcmc import run_experiment, compare_vae_hmc_loss
 
 sess = ed.get_session() # need to make sure tf and edward share the global session
@@ -63,25 +64,35 @@ utils.plot_digits(mnist_wrapper_object, '{}-{}-reconstructions'.format(mnist_wra
                   original_reconstructions, n=10)
 
 # =============================== INFERENCE ====================================
-inference_batch_size = 1
-x_gt, _ = mnist_dataset.test.next_batch(inference_batch_size)
-plot(x_gt)
+inference_batch_size = 10
+# x_gt, _ = mnist_dataset.test.next_batch(inference_batch_size)
+
+f = open("./adversarial_examples_v0.pckl", 'rb')
+attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
+f.close()
+
+x_ad = adversarial_examples[0:inference_batch_size]
+
+for i in range(x_ad.shape[0]):
+    plot_save(attack_set[i].reshape(1, 784), # first number is sample number
+              './out/{}_x_gt_label_{}_target{}.png'.format(i+1, attack_set_labels[i], adversarial_targets[i]))
 
 config = {
     'model': 'hmc',
-    'inference_batch_size': 1,
-    'T': 5000,
+    'inference_batch_size': inference_batch_size,
+    'T': 10000,
     'img_dim': 28,
     'step_size': None,
     'leapfrog_steps': None,
     'friction': None,
     'z_dim': 50,
     'likelihood_variance': 2.5,
-    'useDiscL': True
+    'useDiscL': True,
+    'keep_ratio': 0.05
 }
 
 # Hack this shit
 tf.logging.set_verbosity(tf.logging.ERROR)
 model._training = tf.constant([False])
-qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_gt, config, model.discriminator_l_op)
-compare_vae_hmc_loss(model.decode_op, model.encode_op, x_gt, qz_kept, num_samples=100)
+qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, model.discriminator_l_op)
+compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op, x_ad, qz_kept, config, num_samples=100)
