@@ -209,9 +209,9 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
         plot_save(tf.reshape(tf.slice(tf.reshape(P(best_latent_sample), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(),
                   './out/{}_best_latent.png'.format(img_num))
     else:
-        plot_save(P(Q(x_gt)[0])[0].eval(), './out/vae_recon.png')
-        plot_save(P(best_recon_sample)[0].eval(), './out/best_recon.png')
-        plot_save(P(best_l2_sample)[0].eval(), './out/best_l2.png')
+        plot_save(P(Q(x_gt)[0])[0].eval(), './out/{}_vae_recon.png'.format(img_num))
+        plot_save(P(best_recon_sample)[0].eval(), './out/{}_best_recon.png'.format(img_num))
+        plot_save(P(best_l2_sample)[0].eval(), './out/{}_best_l2.png'.format(img_num))
 
     return best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss,\
            vae_recon_loss, vae_l2_loss, vae_latent_loss

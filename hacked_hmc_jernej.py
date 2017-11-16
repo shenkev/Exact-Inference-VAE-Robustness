@@ -101,7 +101,7 @@ model._training = tf.constant([False])
 f = open('log.txt', 'w')
 for i in range(inference_batch_size):
     x_ad_i = x_ad[i:i+1]
-    config['img_num'] = i
+    config['img_num'] = i+1
     qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad_i, config, model.discriminator_l_op)
     best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss, \
     vae_recon_loss, vae_l2_loss, vae_latent_loss\
