@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 import tensorflow as tf
 import edward as ed
@@ -10,7 +12,7 @@ from stolen_jernej_code_vae_gan.report import Report
 import stolen_jernej_code_vae_gan.other_util_plotting as util2
 
 from mcmc.util import plot, plot_save
-from mcmc.mcmc import run_experiment, compare_vae_hmc_loss
+from mcmc.mcmc2 import run_experiment, compare_vae_hmc_loss
 
 sess = ed.get_session() # need to make sure tf and edward share the global session
 
@@ -80,19 +82,40 @@ for i in range(x_ad.shape[0]):
 config = {
     'model': 'hmc',
     'inference_batch_size': inference_batch_size,
-    'T': 10000,
+    'T': 20000,
     'img_dim': 28,
     'step_size': None,
     'leapfrog_steps': None,
     'friction': None,
     'z_dim': 50,
-    'likelihood_variance': 2.5,
-    'useDiscL': True,
-    'keep_ratio': 0.05
+    'likelihood_variance': 0.45,
+    'useDiscL': False,
+    'keep_ratio': 0.05,
+    'img_num': 0
 }
 
 # Hack this shit
 tf.logging.set_verbosity(tf.logging.ERROR)
 model._training = tf.constant([False])
-qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, model.discriminator_l_op)
-compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op, x_ad, qz_kept, config, num_samples=100)
+
+f = open('log.txt', 'w')
+for i in range(inference_batch_size):
+    x_ad_i = x_ad[i:i+1]
+    config['img_num'] = i
+    qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad_i, config, model.discriminator_l_op)
+    best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss, \
+    vae_recon_loss, vae_l2_loss, vae_latent_loss\
+        = compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op, x_ad_i, qz_kept, config, num_samples=100)
+
+    print ("---------- Summary Image {} ------------".format(i+1), file=f)
+    print("VAE recon loss: " + str(vae_recon_loss), file=f)
+    print("VAE L2 loss: " + str(vae_l2_loss), file=f)
+    print("VAE latent loss: " + str(vae_latent_loss), file=f)
+    print("Best mcmc recon loss: " + str(best_recon_loss), file=f)
+    print("Best mcmc L2 loss: " + str(best_l2_loss), file=f)
+    print("Best mcmc latent loss: " + str(best_latent_loss), file=f)
+    print("Average mcmc recon loss: " + str(average_recon_loss), file=f)
+    print("Average mcmc l2 loss " + str(average_l2_loss), file=f)
+    print("Average mcmc latent loss " + str(average_latent_loss), file=f)
+
+f.close()
