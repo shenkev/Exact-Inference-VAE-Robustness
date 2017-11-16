@@ -6,7 +6,7 @@ from util import plot, plot_save
 import matplotlib.pyplot as plt
 
 
-def build_experiment(P, Q, x_gt, config):
+def build_experiment(P, Q, x_gt, config, DiscL):
 
     model = config.get('model')
     T = config.get('T')
@@ -27,7 +27,13 @@ def build_experiment(P, Q, x_gt, config):
     if work_around:
         normalized_dec_x = tf.reshape(tf.slice(tf.reshape(normalized_dec_x, [32, 32]), [2, 2], [img_dim, img_dim]), [784,])
 
-    X = Normal(loc=normalized_dec_x, scale=likelihood_variance*tf.ones([inference_batch_size, img_dim * img_dim]))
+    # Compute lth layer of Disc from decoded image
+    if config['useDiscL']:
+        disc_l_normalized_dec_x = DiscL(normalized_dec_x)
+        print tf.shape(disc_l_normalized_dec_x)
+        X = Normal(loc=disc_l_normalized_dec_x, scale=likelihood_variance) # Using L2 Loss in the Discriminator Lth Layer space for HMC P(X|z)
+    else:
+        X = Normal(loc=normalized_dec_x, scale=likelihood_variance*tf.ones([inference_batch_size, img_dim * img_dim])) # Using the L2 loss on Image space for HMC P(X|z)
 
     qz = Empirical(params=tf.Variable(tf.zeros([T, inference_batch_size, z_dim])))
 
@@ -48,7 +54,11 @@ def build_experiment(P, Q, x_gt, config):
         inference = ed.Gibbs({z: qz}, data={X: x_gt})
 
     else:  # default to hmc
-        inference = ed.HMC({z: qz}, data={X: x_gt})
+        if config['useDiscL']:
+            discl_x_gt = DiscL(x_gt) # Get the Lth layer discriminator 
+            inference = ed.HMC({z: qz}, data={X: discl_x_gt}) 
+        else:
+            inference = ed.HMC({z: qz}, data={X: x_gt}) 
 
     if step_size is not None and model == 'sghmc':
         inference.initialize(step_size=step_size, friction=friction)
@@ -70,7 +80,7 @@ def build_experiment(P, Q, x_gt, config):
     return inference, qz
 
 
-def run_experiment(P, Q, x_gt, config):
+def run_experiment(P, Q, x_gt, config, DiscL):
 
     """
         Example configuration
@@ -94,7 +104,7 @@ def run_experiment(P, Q, x_gt, config):
     hmc_steps = config.get('T')  # how many steps to run hmc for, include burn-in steps
     keep_ratio = 0.05  # keep only last <keep_ratio> percentage of hmc samples (due to burn-in)
 
-    inference, qz = build_experiment(P, Q, x_gt, config)
+    inference, qz = build_experiment(P, Q, x_gt, config, DiscL)
 
     for _ in range(hmc_steps):
         info_dict = inference.update()
