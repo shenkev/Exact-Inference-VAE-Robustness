@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from util import plot, plot_save
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 """
     Because I screwed up the first mcmc.py by doing for-loops over samples
@@ -135,6 +136,7 @@ def run_experiment(P, Q, x_gt, config, DiscL):
 
 
 def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
+    print ("Starting evaluation...")
 
     img_num = config.get('img_num')
 
@@ -151,7 +153,7 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
     total_l2_loss = 0.0
     total_latent_loss = 0.0
 
-    for i, sample in enumerate(samples_to_check):
+    for i, sample in enumerate(tqdm(samples_to_check)):
 
         r_loss = recon_loss(x_gt, sample, P)
         l_loss = l2_loss(x_gt, sample, P)
@@ -183,7 +185,7 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
     vae_recon_loss = recon_loss(x_gt, Q(x_gt), P)
     vae_l2_loss = l2_loss(x_gt, Q(x_gt), P)
     vae_latent_loss = l_latent_loss(x_gt, Q(x_gt), P, DiscL)
-    print ("---------- Summary Image {} ------------".format(img_num+1))
+    print ("---------- Summary Image {} ------------".format(img_num))
     if jernej_Q_P:
         print ("VAE recon loss: " + str(vae_recon_loss))
         print ("VAE L2 loss: " + str(vae_l2_loss))

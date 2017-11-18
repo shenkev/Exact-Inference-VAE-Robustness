@@ -66,7 +66,7 @@ utils.plot_digits(mnist_wrapper_object, '{}-{}-reconstructions'.format(mnist_wra
                   original_reconstructions, n=10)
 
 # =============================== INFERENCE ====================================
-inference_batch_size = 10
+inference_batch_size = 2
 # x_gt, _ = mnist_dataset.test.next_batch(inference_batch_size)
 
 f = open("./adversarial_examples_v0.pckl", 'rb')
@@ -77,12 +77,13 @@ x_ad = adversarial_examples[0:inference_batch_size]
 
 for i in range(x_ad.shape[0]):
     plot_save(attack_set[i].reshape(1, 784), # first number is sample number
-              './out/{}_x_gt_label_{}_target{}.png'.format(i+1, attack_set_labels[i], adversarial_targets[i]))
+              './out/{}_x_gt_label_{}_target{}.png'.format(str(i+1).zfill(3), attack_set_labels[i], adversarial_targets[i]))
+
 
 config = {
     'model': 'hmc',
     'inference_batch_size': inference_batch_size,
-    'T': 20000,
+    'T': 10000,
     'img_dim': 28,
     'step_size': None,
     'leapfrog_steps': None,
@@ -101,11 +102,11 @@ model._training = tf.constant([False])
 f = open('log.txt', 'w')
 for i in range(inference_batch_size):
     x_ad_i = x_ad[i:i+1]
-    config['img_num'] = i+1
+    config['img_num'] = str(i + 1).zfill(3)
     qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad_i, config, model.discriminator_l_op)
     best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss, \
     vae_recon_loss, vae_l2_loss, vae_latent_loss\
-        = compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op, x_ad_i, qz_kept, config, num_samples=100)
+        = compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op, x_ad_i, qz_kept, config, num_samples=20)
 
     print ("---------- Summary Image {} ------------".format(i+1), file=f)
     print("VAE recon loss: " + str(vae_recon_loss), file=f)
