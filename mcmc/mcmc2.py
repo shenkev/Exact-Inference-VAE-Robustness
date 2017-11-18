@@ -5,6 +5,7 @@ import tensorflow as tf
 from util import plot, plot_save
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import numpy as np
 
 """
     Because I screwed up the first mcmc.py by doing for-loops over samples
@@ -12,6 +13,16 @@ from tqdm import tqdm
 """
 
 jernej_Q_P = True
+
+def trim_32_to_28(input):
+    trimed_list = None
+    for i in range(input.shape[0]):
+        trimed = tf.reshape(tf.slice(tf.reshape(input[i], [32, 32]), [2, 2], [28, 28]), [1, 784])
+        if trimed_list is None:
+            trimed_list = trimed
+        else:
+            trimed_list = tf.concat([trimed_list, trimed], 0)
+    return trimed_list
 
 def build_experiment(P, Q, x_gt, config, DiscL):
 
@@ -28,10 +39,11 @@ def build_experiment(P, Q, x_gt, config, DiscL):
 
     z = Normal(loc=tf.zeros([inference_batch_size, z_dim]), scale=tf.ones([inference_batch_size, z_dim]))  # sample z
 
-    normalized_dec_x = P(z)[0]
-
     if jernej_Q_P:
-        normalized_dec_x = tf.reshape(tf.slice(tf.reshape(normalized_dec_x, [32, 32]), [2, 2], [img_dim, img_dim]), [784,])
+        normalized_dec_x = P(z)
+        normalized_dec_x = trim_32_to_28(normalized_dec_x)
+    else:
+        normalized_dec_x = P(z)[0]
 
     # Compute lth layer of Disc from decoded image
     if config['useDiscL']:
@@ -105,7 +117,6 @@ def run_experiment(P, Q, x_gt, config, DiscL):
 
     hmc_steps = config.get('T')  # how many steps to run hmc for, include burn-in steps
     keep_ratio = config.get('keep_ratio')  # keep only last <keep_ratio> percentage of hmc samples (due to burn-in)
-    img_num = config.get('img_num')
 
     inference, qz = build_experiment(P, Q, x_gt, config, DiscL)
 
@@ -116,48 +127,42 @@ def run_experiment(P, Q, x_gt, config, DiscL):
     to_keep_index = int((1 - keep_ratio) * hmc_steps)
     qz_kept = Empirical(qz.params[to_keep_index:])
 
-    sample_to_vis = 5
-    qz_sample = qz_kept.sample(sample_to_vis)
-
-    for i in range(sample_to_vis):
-        img = P(qz_sample[i])[0]
-        if jernej_Q_P:
-            img = tf.reshape(tf.slice(tf.reshape(img, [32, 32]), [2, 2], [28, 28]), [1, 784])
-        plot_save(img.eval(), './out/{}_mcmc_sample_{}.png'.format(img_num, i+1))
-
-    plot_save(x_gt, './out/{}_x_adversarial.png'.format(img_num))
-
-    avg_img = P(tf.reduce_mean(qz_sample, 0))[0]
-    if jernej_Q_P:
-        avg_img = tf.reshape(tf.slice(tf.reshape(avg_img, [32, 32]), [2, 2], [28, 28]), [1, 784])
-    plot_save(avg_img.eval(), './out/{}_mcmcMean.png'.format(img_num))
-
     return qz, qz_kept
 
 
-def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
+def compare_vae_hmc_loss(P, Q, DiscL, x_gt, samples_to_check, config):
     print ("Starting evaluation...")
 
+    x_samples_to_check = trim_32_to_28(P(samples_to_check)).eval()
+    l_th_layer_samples = DiscL(trim_32_to_28(P(samples_to_check)))
+    l_th_x_gt = DiscL(x_gt)
+    x_samples_to_check = np.expand_dims(x_samples_to_check, 1)
+    num_samples = samples_to_check.shape[0]
     img_num = config.get('img_num')
+    sample_to_vis = config.get('sample_to_vis')
 
-    samples_to_check = qz_kept.sample(num_samples).eval()
-
-    best_recon_sample = samples_to_check[0]
-    best_recon_loss = recon_loss(x_gt, best_recon_sample, P)
-    best_l2_sample = samples_to_check[0]
-    best_l2_loss = l2_loss(x_gt, best_l2_sample, P)
-    best_latent_sample = samples_to_check[0]
-    best_latent_loss = l_latent_loss(x_gt, best_latent_sample, P, DiscL)
+    best_recon_sample = x_samples_to_check[0]
+    best_recon_loss = recon_loss(x_gt, best_recon_sample)
+    best_l2_sample = x_samples_to_check[0]
+    best_l2_loss = l2_loss(x_gt, best_l2_sample)
+    best_latent_sample = x_samples_to_check[0]
+    best_latent_loss = l_latent_loss(l_th_x_gt, l_th_layer_samples[0:0+1])
 
     total_recon_loss = 0.0
     total_l2_loss = 0.0
     total_latent_loss = 0.0
 
-    for i, sample in enumerate(tqdm(samples_to_check)):
+    for i, sample in enumerate(tqdm(x_samples_to_check)):
 
-        r_loss = recon_loss(x_gt, sample, P)
-        l_loss = l2_loss(x_gt, sample, P)
-        lat_loss = l_latent_loss(x_gt, sample, P, DiscL)
+        for j in range(sample_to_vis):
+            plot_save(x_samples_to_check[j], './out/{}_mcmc_sample_{}.png'.format(img_num, j + 1))
+
+        avg_img = np.mean(x_samples_to_check, axis=0)
+        plot_save(avg_img, './out/{}_mcmcMean.png'.format(img_num))
+
+        r_loss = recon_loss(x_gt, sample)
+        l_loss = l2_loss(x_gt, sample)
+        lat_loss = l_latent_loss(l_th_x_gt, l_th_layer_samples[i:i+1])
         total_recon_loss += r_loss
         total_l2_loss += l_loss
         total_latent_loss += lat_loss
@@ -176,15 +181,14 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
 
         # print ("Recon loss: " + str(r_loss))
         # print ("L2 loss: " + str(l_loss))
-        # print "------------- Evaluating {}/{} --------------".format(i+1, num_samples)
 
     average_recon_loss = total_recon_loss/num_samples
     average_l2_loss = total_l2_loss/num_samples
     average_latent_loss = total_latent_loss /num_samples
 
-    vae_recon_loss = recon_loss(x_gt, Q(x_gt), P)
-    vae_l2_loss = l2_loss(x_gt, Q(x_gt), P)
-    vae_latent_loss = l_latent_loss(x_gt, Q(x_gt), P, DiscL)
+    vae_recon_loss = recon_loss(x_gt, trim_32_to_28(P(Q(x_gt))))
+    vae_l2_loss = l2_loss(x_gt, trim_32_to_28(P(Q(x_gt))))
+    vae_latent_loss = l_latent_loss(l_th_x_gt, P(Q(x_gt)))
     print ("---------- Summary Image {} ------------".format(img_num))
     if jernej_Q_P:
         print ("VAE recon loss: " + str(vae_recon_loss))
@@ -204,12 +208,9 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
     if jernej_Q_P:
         plot_save(tf.reshape(tf.slice(tf.reshape(P(Q(x_gt)), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(),
                   './out/{}_vae_recon.png'.format(img_num))
-        plot_save(tf.reshape(tf.slice(tf.reshape(P(best_recon_sample), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(),
-                  './out/{}_best_recon.png'.format(img_num))
-        plot_save(tf.reshape(tf.slice(tf.reshape(P(best_l2_sample), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(),
-                  './out/{}_best_l2.png'.format(img_num))
-        plot_save(tf.reshape(tf.slice(tf.reshape(P(best_latent_sample), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(),
-                  './out/{}_best_latent.png'.format(img_num))
+        plot_save(best_recon_sample, './out/{}_best_recon.png'.format(img_num))
+        plot_save(best_l2_sample, './out/{}_best_l2.png'.format(img_num))
+        plot_save(best_latent_sample, './out/{}_best_latent.png'.format(img_num))
     else:
         plot_save(P(Q(x_gt)[0])[0].eval(), './out/{}_vae_recon.png'.format(img_num))
         plot_save(P(best_recon_sample)[0].eval(), './out/{}_best_recon.png'.format(img_num))
@@ -219,25 +220,22 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, qz_kept, config, num_samples=100):
            vae_recon_loss, vae_l2_loss, vae_latent_loss
 
 
-def l2_loss(x_gt, z_hmc, P):
+def l2_loss(x_gt, x_hmc):
     if jernej_Q_P:
-        return tf.norm(x_gt - tf.reshape(tf.slice(tf.reshape(P(z_hmc), [32, 32]), [2, 2], [28, 28]), [1, 784])).eval()
+        return tf.norm(x_gt - x_hmc).eval()
     else:
-        return tf.norm(x_gt-P(z_hmc)[0]).eval()
+        return tf.norm(x_gt-x_hmc).eval()
 
 
-def recon_loss(x_gt, z_hmc, P):
+def recon_loss(x_gt, x_hmc):
     if jernej_Q_P:
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=tf.reshape(tf.slice(tf.reshape(P(z_hmc), [32, 32]), [2, 2], [28, 28]), [1, 784]), labels=x_gt), 1).eval()
+        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc, labels=x_gt), 1).eval()
     else:
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=P(z_hmc)[1], labels=x_gt), 1).eval()
+        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc[1], labels=x_gt), 1).eval()
 
 
-def l_latent_loss(x_gt, z_hmc, P, DiscL):
-    normalized_dec_x = P(z_hmc)
-    disc_l_normalized_dec_x = DiscL(tf.reshape(tf.slice(tf.reshape(normalized_dec_x, [32, 32]), [2, 2], [28, 28]), [-1, 784]))
-    return tf.norm(DiscL(x_gt) - disc_l_normalized_dec_x).eval()
+def l_latent_loss(l_th_x_gt, l_th_x_hmc):
+    return tf.norm(l_th_x_gt - l_th_x_hmc).eval()
 
 
 def init_uninited_vars():
