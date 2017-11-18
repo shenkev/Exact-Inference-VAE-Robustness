@@ -134,7 +134,7 @@ class ModelBase(object):
         inputs = self._get_input_placeholder(num_gpus)
         labels = self._get_labels_placeholder(num_gpus)
         for gpu in xrange(num_gpus):
-            with tf.device('/gpu:{}'.format(gpu)):
+            with tf.device('/cpu:{}'.format(gpu)):
                 with tf.name_scope('tower_{}'.format(gpu)) as scope:
                     # Grab this portion of the input.
                     input_slice = inputs[gpu * self.batch_size:(gpu + 1) * self.batch_size, :]

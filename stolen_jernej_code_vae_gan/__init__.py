@@ -133,12 +133,20 @@ class Model(model.GenerativeModelBase):
 
     def _build_gradients(self, optimizers, gradients, losses):
         for name, optimizer, loss in zip(['encoder', 'decoder', 'discriminator'], optimizers, losses):
-            gradients.setdefault(name, []).append(
-                optimizer.compute_gradients(
-                    loss,
-                    var_list=self._get_model_variables(name, tf.GraphKeys.TRAINABLE_VARIABLES)
+            if name == 'decoder':
+                gradients.setdefault(name, []).append(
+                    optimizer.compute_gradients(
+                        loss,
+                        var_list=self._get_model_variables('encoder', tf.GraphKeys.TRAINABLE_VARIABLES)
+                    )
                 )
-            )
+            else:
+                gradients.setdefault(name, []).append(
+                    optimizer.compute_gradients(
+                        loss,
+                        var_list=self._get_model_variables(name, tf.GraphKeys.TRAINABLE_VARIABLES)
+                    )
+                )
 
     def _build_apply_gradients(self, optimizers, gradients, global_step):
         operations = []
