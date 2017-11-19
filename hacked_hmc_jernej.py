@@ -50,7 +50,7 @@ model.set_defaults(reconstruction={'sampling': model_sample_reconstructions})
 checkpoint = 'models/mnist-vae-gan-v0.weights.tfmod'
 model.load(checkpoint)
 
-# =============================== INFERENCE ====================================
+# ========================= TEST FOR FREEZING DECODER ==========================
 
 print("Decoder weights before training:")
 decoder = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model-vae-gan/decoder')
