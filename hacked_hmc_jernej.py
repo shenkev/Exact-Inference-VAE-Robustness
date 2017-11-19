@@ -84,6 +84,12 @@ def l_latent_loss(l_th_x_gt, l_th_x_hmc):
 inference_batch_size = 448  # use a multiple of 32, I'm too lazy to hack around his reconstruct code which only takes mul of 32
 start_ind = 0
 
+num_samples = 50
+sample_to_vis = 3
+log_name = 'log.txt'
+T = 20000
+
+
 f = open("./adversarial_examples_v0.pckl", 'rb')
 attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
 f.close()
@@ -106,7 +112,7 @@ for i in range(x_ad.shape[0]):
 config = {
     'model': 'hmc',
     'inference_batch_size': inference_batch_size,
-    'T': 20000,
+    'T': T,
     'img_dim': 28,
     'step_size': None,
     'leapfrog_steps': None,
@@ -124,8 +130,6 @@ model._training = tf.constant([False])
 qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, model.discriminator_l_op)
 
 # =============================== EVALUATION ====================================
-
-num_samples = 50
 samples = qz_kept.sample(num_samples)
 
 x_samples = trim_32_to_28(model.decode_op(tf.reshape(samples, [-1, config.get('z_dim')])))
@@ -156,8 +160,6 @@ min_recon = np.argmin(recon_losses, axis=0)
 avg_recon_loss = np.mean(recon_losses, axis=0)
 min_latent = np.argmin(l_latent_losses, axis=0)
 avg_latent_loss = np.mean(l_latent_losses, axis=0)
-
-sample_to_vis = 3
 
 f = open('log.txt', 'ab')
 for i in tqdm(range(inference_batch_size)):
