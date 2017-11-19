@@ -15,14 +15,15 @@ import numpy as np
 jernej_Q_P = True
 
 def trim_32_to_28(input):
-    trimed_list = None
-    for i in range(input.shape[0]):
-        trimed = tf.reshape(tf.slice(tf.reshape(input[i], [32, 32]), [2, 2], [28, 28]), [1, 784])
-        if trimed_list is None:
-            trimed_list = trimed
-        else:
-            trimed_list = tf.concat([trimed_list, trimed], 0)
-    return trimed_list
+    with tf.variable_scope('trim_32_to_28', reuse=True):
+        trimed_list = None
+        for i in range(input.shape[0]):
+            trimed = tf.reshape(tf.slice(tf.reshape(input[i], [32, 32]), [2, 2], [28, 28]), [1, 784])
+            if trimed_list is None:
+                trimed_list = trimed
+            else:
+                trimed_list = tf.concat([trimed_list, trimed], 0)
+        return trimed_list
 
 def build_experiment(P, Q, x_gt, config, DiscL):
 
@@ -206,8 +207,7 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, samples_to_check, config):
     print ("Average mcmc latent loss " + str(average_latent_loss))
 
     if jernej_Q_P:
-        plot_save(tf.reshape(tf.slice(tf.reshape(P(Q(x_gt)), [32, 32]), [2, 2], [28, 28]), [1, 784]).eval(),
-                  './out/{}_vae_recon.png'.format(img_num))
+        plot_save(trim_32_to_28(P(Q(x_gt))).eval(), './out/{}_vae_recon.png'.format(img_num))
         plot_save(best_recon_sample, './out/{}_best_recon.png'.format(img_num))
         plot_save(best_l2_sample, './out/{}_best_l2.png'.format(img_num))
         plot_save(best_latent_sample, './out/{}_best_latent.png'.format(img_num))
@@ -221,21 +221,24 @@ def compare_vae_hmc_loss(P, Q, DiscL, x_gt, samples_to_check, config):
 
 
 def l2_loss(x_gt, x_hmc):
-    if jernej_Q_P:
-        return tf.norm(x_gt - x_hmc).eval()
-    else:
-        return tf.norm(x_gt-x_hmc).eval()
+    with tf.variable_scope('l2_loss', reuse=True):
+        if jernej_Q_P:
+            return tf.norm(x_gt - x_hmc).eval()
+        else:
+            return tf.norm(x_gt - x_hmc).eval()
 
 
 def recon_loss(x_gt, x_hmc):
-    if jernej_Q_P:
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc, labels=x_gt), 1).eval()
-    else:
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc[1], labels=x_gt), 1).eval()
+    with tf.variable_scope('recon_loss', reuse=True):
+        if jernej_Q_P:
+            return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc, labels=x_gt), 1).eval()
+        else:
+            return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc[1], labels=x_gt), 1).eval()
 
 
 def l_latent_loss(l_th_x_gt, l_th_x_hmc):
-    return tf.norm(l_th_x_gt - l_th_x_hmc).eval()
+    with tf.variable_scope('l_latent_loss', reuse=True):
+        return tf.norm(l_th_x_gt - l_th_x_hmc).eval()
 
 
 def init_uninited_vars():
