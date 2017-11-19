@@ -2,11 +2,6 @@ from edward.models import Empirical, Normal
 import edward as ed
 import tensorflow as tf
 
-from util import plot, plot_save
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import numpy as np
-
 """
     Because I screwed up the first mcmc.py by doing for-loops over samples
 
@@ -129,118 +124,6 @@ def run_experiment(P, Q, x_gt, config, DiscL):
     qz_kept = Empirical(qz.params[to_keep_index:])
 
     return qz, qz_kept
-
-
-def compare_vae_hmc_loss(P, Q, DiscL, x_gt, samples_to_check, config):
-    print ("Starting evaluation...")
-
-    with tf.variable_scope('compare_vae_hmc_loss', reuse=True):
-
-        x_samples_to_check = trim_32_to_28(P(samples_to_check)).eval()
-        l_th_layer_samples = DiscL(trim_32_to_28(P(samples_to_check)))
-        l_th_x_gt = DiscL(x_gt)
-        x_samples_to_check = np.expand_dims(x_samples_to_check, 1)
-        num_samples = samples_to_check.shape[0]
-        img_num = config.get('img_num')
-        sample_to_vis = config.get('sample_to_vis')
-
-        best_recon_sample = x_samples_to_check[0]
-        best_recon_loss = recon_loss(x_gt, best_recon_sample)
-        best_l2_sample = x_samples_to_check[0]
-        best_l2_loss = l2_loss(x_gt, best_l2_sample)
-        best_latent_sample = x_samples_to_check[0]
-        best_latent_loss = l_latent_loss(l_th_x_gt, l_th_layer_samples[0:0+1])
-
-        total_recon_loss = 0.0
-        total_l2_loss = 0.0
-        total_latent_loss = 0.0
-
-        for i, sample in enumerate(tqdm(x_samples_to_check)):
-
-            for j in range(sample_to_vis):
-                plot_save(x_samples_to_check[j], './out/{}_mcmc_sample_{}.png'.format(img_num, j + 1))
-
-            avg_img = np.mean(x_samples_to_check, axis=0)
-            plot_save(avg_img, './out/{}_mcmcMean.png'.format(img_num))
-
-            r_loss = recon_loss(x_gt, sample)
-            l_loss = l2_loss(x_gt, sample)
-            lat_loss = l_latent_loss(l_th_x_gt, l_th_layer_samples[i:i+1])
-            total_recon_loss += r_loss
-            total_l2_loss += l_loss
-            total_latent_loss += lat_loss
-
-            if r_loss < best_recon_loss:
-                best_recon_sample = sample
-                best_recon_loss = r_loss
-
-            if l_loss < best_l2_loss:
-                best_l2_sample = sample
-                best_l2_loss = l_loss
-
-            if lat_loss < best_latent_loss:
-                best_latent_sample = sample
-                best_latent_loss = lat_loss
-
-            # print ("Recon loss: " + str(r_loss))
-            # print ("L2 loss: " + str(l_loss))
-
-        average_recon_loss = total_recon_loss/num_samples
-        average_l2_loss = total_l2_loss/num_samples
-        average_latent_loss = total_latent_loss /num_samples
-
-        vae_recon_loss = recon_loss(x_gt, trim_32_to_28(P(Q(x_gt))))
-        vae_l2_loss = l2_loss(x_gt, trim_32_to_28(P(Q(x_gt))))
-        vae_latent_loss = l_latent_loss(l_th_x_gt, P(Q(x_gt)))
-        print ("---------- Summary Image {} ------------".format(img_num))
-        if jernej_Q_P:
-            print ("VAE recon loss: " + str(vae_recon_loss))
-            print ("VAE L2 loss: " + str(vae_l2_loss))
-            print ("VAE latent loss: " + str(vae_latent_loss))
-        else:
-            print ("VAE recon loss: " + str(recon_loss(x_gt, Q(x_gt)[0], P)))
-            print ("VAE L2 loss: " + str(l2_loss(x_gt, Q(x_gt)[0], P)))
-
-        print ("Best mcmc recon loss: " + str(best_recon_loss))
-        print ("Best mcmc L2 loss: " + str(best_l2_loss))
-        print ("Best mcmc latent loss: " + str(best_latent_loss))
-        print ("Average mcmc recon loss: " + str(average_recon_loss))
-        print ("Average mcmc l2 loss " + str(average_l2_loss))
-        print ("Average mcmc latent loss " + str(average_latent_loss))
-
-        if jernej_Q_P:
-            plot_save(trim_32_to_28(P(Q(x_gt))).eval(), './out/{}_vae_recon.png'.format(img_num))
-            plot_save(best_recon_sample, './out/{}_best_recon.png'.format(img_num))
-            plot_save(best_l2_sample, './out/{}_best_l2.png'.format(img_num))
-            plot_save(best_latent_sample, './out/{}_best_latent.png'.format(img_num))
-        else:
-            plot_save(P(Q(x_gt)[0])[0].eval(), './out/{}_vae_recon.png'.format(img_num))
-            plot_save(P(best_recon_sample)[0].eval(), './out/{}_best_recon.png'.format(img_num))
-            plot_save(P(best_l2_sample)[0].eval(), './out/{}_best_l2.png'.format(img_num))
-
-        return best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss,\
-               vae_recon_loss, vae_l2_loss, vae_latent_loss
-
-
-def l2_loss(x_gt, x_hmc):
-    with tf.variable_scope('l2_loss', reuse=True):
-        if jernej_Q_P:
-            return tf.norm(x_gt - x_hmc).eval()
-        else:
-            return tf.norm(x_gt - x_hmc).eval()
-
-
-def recon_loss(x_gt, x_hmc):
-    with tf.variable_scope('recon_loss', reuse=True):
-        if jernej_Q_P:
-            return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc, labels=x_gt), 1).eval()
-        else:
-            return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=x_hmc[1], labels=x_gt), 1).eval()
-
-
-def l_latent_loss(l_th_x_gt, l_th_x_hmc):
-    with tf.variable_scope('l_latent_loss', reuse=True):
-        return tf.norm(l_th_x_gt - l_th_x_hmc).eval()
 
 
 def init_uninited_vars():
