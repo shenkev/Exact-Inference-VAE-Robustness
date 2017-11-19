@@ -206,10 +206,11 @@ class ModelBase(object):
         dummy_placeholder = self._get_input_placeholder()
         self._model(dummy_placeholder)
 
-    def train(self, data_sets, epochs, checkpoint=None, checkpoint_every=1):
+    def train(self, data_sets, epochs, original_checkpoint=None, new_model_checkpoint=None, checkpoint_every=1):
         """Train the model."""
-        if not checkpoint:
-            checkpoint = self.get_model_filename()
+        if not new_model_checkpoint:
+            print("No checkpoint, using default file name:" + self.get_model_filename)
+            new_model_checkpoint = self.get_model_filename()
 
         # Detect the number of GPUs.
         num_gpus = self._get_num_gpus()
@@ -224,6 +225,11 @@ class ModelBase(object):
         total_batch = int(np.floor(self.examples_per_epoch / (self.batch_size * num_gpus)))
 
         saver = tf.train.Saver(variables)
+        
+        # Load the original weights first
+        if original_checkpoint is not None:
+            self.load(original_checkpoint)
+
         for epoch in tqdm.tqdm(range(epochs), desc='Epoch'):
             progress = tqdm.tqdm(total=total_batch, desc='Batch (loss=?.???)', leave=False)
             for i in range(total_batch):
@@ -257,9 +263,9 @@ class ModelBase(object):
 
             # Checkpoint model.
             if epoch % checkpoint_every == 0:
-                saver.save(self.session, checkpoint)
+                saver.save(self.session, new_model_checkpoint)
 
-        saver.save(self.session, checkpoint)
+        saver.save(self.session, new_model_checkpoint)
 
     def batch_apply(self, operation, feed_dict):
         """Runs on operation by splitting inputs into batches."""

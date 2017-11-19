@@ -52,18 +52,25 @@ model.load(checkpoint)
 
 # =============================== INFERENCE ====================================
 
+print("Decoder weights before training:")
 decoder = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model-vae-gan/decoder')
 print(decoder[0], decoder[0].eval())
+
+print("Encoder weights before training:")
+encoder = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model-vae-gan/encoder')
+print(encoder[0], encoder[0].eval())
 
 model.train(
     mnist_dataset,
     epochs=1,
-    checkpoint='models/mnist-vae-gan-v1.weights.tfmod'
+    original_checkpoint='models/mnist-vae-gan-v0.weights.tfmod',
+    new_model_checkpoint='models/mnist-vae-gan-v1.weights.tfmod'
 )
 
-decoder = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model-vae-gan/decoder')
+print("Decoder weights after training:")
 print(decoder[0], decoder[0].eval())
-
+print("Encoder weights after training:")
+print(encoder[0], encoder[0].eval())
 
 # ==============================================================================
 
