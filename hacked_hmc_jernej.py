@@ -82,12 +82,12 @@ def l_latent_loss(l_th_x_gt, l_th_x_hmc):
 
 # =============================== INFERENCE ====================================
 inference_batch_size = 448  # use a multiple of 32, I'm too lazy to hack around his reconstruct code which only takes mul of 32
-start_ind = 0
+start_ind = 0  # don't exceed 448 for inference_batch_size or GPU runs out of memory on cluster
 
-num_samples = 50
-sample_to_vis = 3
+num_samples = 100  # how many hmc samples to check over to find the best one
+sample_to_vis = 3  # how many hmc samples to plot per ground truth image
 log_name = 'log.txt'
-T = 20000
+T = 20000  # how many inference steps to do
 
 
 f = open("./adversarial_examples_v0.pckl", 'rb')
