@@ -81,7 +81,7 @@ def l_latent_loss(l_th_x_gt, l_th_x_hmc):
         return tf.norm(l_th_x_gt - l_th_x_hmc, axis=len(l_th_x_hmc.get_shape().as_list())-1)
 
 # =============================== INFERENCE ====================================
-inference_batch_size = 3
+inference_batch_size = 448  # use a multiple of 32, I'm too lazy to hack around his reconstruct code which only takes mul of 32
 start_ind = 0
 
 f = open("./adversarial_examples_v0.pckl", 'rb')
@@ -94,6 +94,7 @@ adversarial_examples = adversarial_examples[start_ind:]
 adversarial_targets = adversarial_targets[start_ind:]
 
 x_ad = adversarial_examples[0:inference_batch_size]
+vae_recon = trim_32_to_28(model.reconstruct(x_ad))  # model.reconstruct literally won't run if I put it 30 lines down
 
 for i in range(x_ad.shape[0]):
     plot_save(attack_set[i].reshape(1, 784), # first number is sample number
@@ -105,7 +106,7 @@ for i in range(x_ad.shape[0]):
 config = {
     'model': 'hmc',
     'inference_batch_size': inference_batch_size,
-    'T': 1000,
+    'T': 20000,
     'img_dim': 28,
     'step_size': None,
     'leapfrog_steps': None,
@@ -124,7 +125,7 @@ qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, mod
 
 # =============================== EVALUATION ====================================
 
-num_samples = 30
+num_samples = 50
 samples = qz_kept.sample(num_samples)
 
 x_samples = trim_32_to_28(model.decode_op(tf.reshape(samples, [-1, config.get('z_dim')])))
@@ -134,9 +135,9 @@ l_samples = tf.reshape(l_samples, [num_samples, inference_batch_size, 1024])
 x_ad_tensor = tf.constant(x_ad)
 l_ad_tensor = model.discriminator_l_op(x_ad_tensor)
 
-vae_recon = trim_32_to_28(model.decode_op(tf.slice(model.encode_op(
-    tf.concat([x_ad_tensor, tf.zeros([(32 - inference_batch_size % 32), 784])], 0)),
-    [0, 0], [inference_batch_size % 32, config.get('z_dim')])))
+# vae_recon = trim_32_to_28(model.decode_op(tf.slice(model.encode_op(
+#     tf.concat([x_ad_tensor, tf.zeros([(32 - inference_batch_size % 32), 784])], 0)),
+#     [0, 0], [inference_batch_size % 32, config.get('z_dim')])))
 vae_l2_loss = l2_loss(x_ad_tensor, vae_recon)
 vae_recon_loss = recon_loss(x_ad_tensor, vae_recon)
 vae_latent_loss = l_latent_loss(l_ad_tensor, model.discriminator_l_op(vae_recon))
