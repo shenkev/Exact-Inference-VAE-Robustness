@@ -38,6 +38,7 @@ attack_class = getattr(importlib.import_module('experiments.attacks.{}'.format(a
 parser.add_argument('--model-dir', type=str, default='models')
 parser.add_argument('--seed', type=int, default=123)
 parser.add_argument('--only-existing', action='store_true')
+parser.add_argument('--no-eval', action='store_true')
 parser.add_argument('--version', type=str, default=None)
 parser.add_argument('--ensemble', action='store_true')
 parser.add_argument('--ensemble-size', type=int, default=2)
@@ -291,6 +292,13 @@ else:
     attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
     f.close()
 
+adversarial_reconstructions = model.reconstruct(adversarial_examples)
+f = open('adversarial_reconstructions_{}.pckl'.format(args.version), 'wb')
+pickle.dump([attack_set, attack_set_labels, adversarial_examples, adversarial_targets, adversarial_reconstructions], f)
+f.close()
+
+if args.no_eval:
+    exit()
 
 # target_examples = attack.get_target_examples()
 # if target_examples is not None:
