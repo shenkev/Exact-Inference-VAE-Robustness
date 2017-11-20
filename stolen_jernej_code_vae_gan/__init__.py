@@ -192,6 +192,22 @@ class Model(model.GenerativeModelBase):
                                      is_training=self._training)
             return x_tilde
 
+    def discriminator_l_op(self, x):
+                # Reshape input as needed.
+        # x, width, height = layers.pad_power2(x, self.width, self.height, self.channels)
+        width, height = self.width, self.height
+
+        # with slim.arg_scope([layers.discriminator],
+        #                     width=width,
+        #                     height=height,
+        #                     channels=self.channels,
+        #                     latent_dim=self.latent_dim,
+        #                     is_training=self._training,
+        #                     reuse=True):
+        with tf.variable_scope(self._model.var_scope, reuse=True):
+            discrimination, lth_layer = layers.discriminator(x, width, height)
+            return lth_layer
+
     def reconstruct_op(self, x, sample=False, sample_times=1):
         model = self._model(x, sample=sample_times)
         if sample:

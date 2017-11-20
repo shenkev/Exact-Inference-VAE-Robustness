@@ -10,6 +10,7 @@ __pycache__/
 .idea/
 test.py
 models/
+log.txt
 
 # Jernej Kos data files
 /Jernej Kos/experiments/models/vae_gan/*
