@@ -33,13 +33,20 @@ class Model(model.GenerativeModelBase):
 
     def _build(self, x, sample=1):
         """Builds the model."""
+        num_IW_samples = 5
+
+        print("WHAT THE FUCKK")
 
         # Reshape input as needed.
         x, width, height = layers.pad_power2(x, self.width, self.height, self.channels)
+        x_IW = tf.tile(x,tf.constant([num_IW_samples,1]))
         # Normal distribution for GAN sampling.
         z_p = tf.random_normal([self.batch_size, self.latent_dim], 0, 1)
+        z_p_IW = tf.random_normal([self.batch_size*num_IW_samples, self.latent_dim], 0, 1)
         # Normal distribution for VAE sampling.
         eps = tf.random_normal([self.batch_size, self.latent_dim], 0, 1)
+        eps_IW = tf.random_normal([self.batch_size*num_IW_samples, self.latent_dim], 0, 1)
+
 
         with slim.arg_scope([layers.encoder, layers.decoder, layers.discriminator],
                             width=width,
@@ -48,23 +55,68 @@ class Model(model.GenerativeModelBase):
                             latent_dim=self.latent_dim,
                             is_training=self._training):
             # Get latent representation for sampling.
-            z_x_mean, z_x_log_sigma_sq = layers.encoder(x)
+            # z_x_mean, z_x_log_sigma_sq = layers.encoder(x)
+            z_x_mean_IW, z_x_log_sigma_sq_IW = layers.encoder(x_IW)
+
+            std_dev = tf.sqrt(tf.exp(z_x_log_sigma_sq_IW))
+            z_x = z_x_mean_IW + eps_IW*std_dev
+            print("THIS IS Z_X")
+            print(z_x)
+
             # Sample from latent space.
-            z_x = []
-            for _ in xrange(sample):
-                z_x.append(tf.add(z_x_mean, tf.multiply(tf.sqrt(tf.exp(z_x_log_sigma_sq)), eps)))
-            if sample > 1:
-                z_x = tf.add_n(z_x) / sample
-            else:
-                z_x = z_x[0]
+            # z_x = []
+            # for _ in xrange(sample):
+            #     z_x.append(tf.add(z_x_mean_IW, tf.multiply(tf.sqrt(tf.exp(z_x_log_sigma_sq_IW)), eps_IW)))
+            # if sample > 1:
+            #     z_x = tf.add_n(z_x) / sample
+            # else:
+            #     z_x = z_x[0]
+
+
+
+            def gaussian_likelihood(data, mean, log_variance):
+                """Log-likelihood of data given ~ N(mean, exp(log_variance))
+
+                Parameters
+                ----------
+                data :
+                    Samples from Gaussian centered at mean
+                mean :
+                    Mean of the Gaussian distribution
+                log_variance :
+                    Log variance of the Gaussian distribution
+
+                Returns
+                -------
+                log_likelihood : float
+
+                """
+                # print data.get_shape().as_list()
+                num_components = data.get_shape().as_list()[1]
+                variance = tf.exp(log_variance)
+                log_likelihood = (
+                    -(log2pi * (num_components / 2.0))
+                    - tf.reduce_sum(
+                        (tf.square(data - mean) / (2 * variance)) + (log_variance / 2.0),
+                        1)
+                )
+
+                return log_likelihood
+
+
             # Generate output.
             x_tilde = layers.decoder(z_x)
+
+            print("shape test")
+            print(x)
+            print(x_tilde)
 
             _, l_x_tilde = layers.discriminator(x_tilde)
 
             with tf.variable_scope(tf.get_variable_scope(), reuse=True):
                 # Generate reconstruction.
-                x_tilde_mean = layers.decoder(z_x_mean)
+                x_tilde_mean = layers.decoder(z_x_mean_IW)
+                print(x_tilde_mean)
 
                 # Generate a new image.
                 x_p = layers.decoder(z_p)
