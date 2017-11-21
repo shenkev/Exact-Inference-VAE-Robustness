@@ -24,6 +24,7 @@ report = Report('results/' + report_filename)
 report.add("Available GPUs", len(utils.get_available_gpus()))
 
 # Load dataset
+print ("Loading dataset...")
 mnist_wrapper_object = mnist_data()
 mnist_dataset = mnist_wrapper_object.get_data()
 
@@ -35,6 +36,7 @@ if rescale == True:
 util2.trim_dataset(mnist_dataset, model_class)
 
 # Load model
+print ("Loading model...")
 version = 'v0'
 model_attributes = {
     'dataset': mnist_wrapper_object,
@@ -52,6 +54,7 @@ checkpoint = 'models/mnist-vae-gan-v0.weights.tfmod'
 model.load(checkpoint)
 
 # Yet another Hack
+print ("Loading model_eval...")
 model_eval = model_class(sess, **model_attributes)
 
 model_eval.build()
@@ -98,6 +101,7 @@ log_name = 'log.txt'
 T = 20000  # how many inference steps to do
 
 
+print ("Loading adversarial examples and plotting them...")
 f = open("./adversarial_examples_v0.pckl", 'rb')
 attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
 f.close()
@@ -139,6 +143,7 @@ qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, mod
 # =============================== EVALUATION ====================================
 samples = qz_kept.sample(num_samples)
 
+print ("Starting evaluation...")
 x_samples = trim_32_to_28(model_eval.decode(tf.reshape(samples, [-1, config.get('z_dim')]).eval()))
 l_samples = model_eval.discriminator_l(x_samples.eval())
 x_samples = tf.reshape(x_samples, [num_samples, inference_batch_size, 784])
@@ -169,7 +174,7 @@ avg_recon_loss = np.mean(recon_losses, axis=0)
 min_latent = np.argmin(l_latent_losses, axis=0)
 avg_latent_loss = np.mean(l_latent_losses, axis=0)
 
-f = open('log.txt', 'ab')
+f = open(log_name, 'ab')
 for i in tqdm(range(inference_batch_size)):
     img_num = str(start_ind+i+1).zfill(3)
     for j in range(sample_to_vis):
