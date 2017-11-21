@@ -396,6 +396,10 @@ class GenerativeModelBase(ModelBase):
         decoder_input, decoder_op = self._cache_op('decoder', self.decode_op, placeholder='latent')
         return self.batch_apply(decoder_op, feed_dict=self._set_training({decoder_input: z}, False))
 
+    def discriminator_l(self, x):
+        discriminator_input, discriminator_op = self._cache_op('discriminator', self.discriminator_l_op)
+        return self.batch_apply(discriminator_op, feed_dict=self._set_training({discriminator_input: x}, False))
+
     def reconstruct_op(self, x, sample=False, sample_times=1):
         """Return an operation for reconstructing an input using the model."""
         raise NotImplementedError

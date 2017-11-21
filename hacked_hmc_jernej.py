@@ -51,6 +51,14 @@ model.set_defaults(reconstruction={'sampling': model_sample_reconstructions})
 checkpoint = 'models/mnist-vae-gan-v0.weights.tfmod'
 model.load(checkpoint)
 
+# Yet another Hack
+model_eval = model_class(sess, **model_attributes)
+
+model_eval.build()
+model_eval.set_defaults(reconstruction={'sampling': model_sample_reconstructions})
+
+model_eval.load(checkpoint)
+
 # Try to reconstruct same test images using model to make sure model loaded properly
 test_set, test_set_labels = mnist_dataset.test.images[:128], mnist_dataset.test.labels[:128]
 
@@ -100,7 +108,6 @@ adversarial_examples = adversarial_examples[start_ind:]
 adversarial_targets = adversarial_targets[start_ind:]
 
 x_ad = adversarial_examples[0:inference_batch_size]
-vae_recon = trim_32_to_28(model.reconstruct(x_ad))  # model.reconstruct literally won't run if I put it 30 lines down
 
 for i in range(x_ad.shape[0]):
     plot_save(attack_set[i].reshape(1, 784), # first number is sample number
@@ -132,8 +139,8 @@ qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, mod
 # =============================== EVALUATION ====================================
 samples = qz_kept.sample(num_samples)
 
-x_samples = trim_32_to_28(model.decode_op(tf.reshape(samples, [-1, config.get('z_dim')])))
-l_samples = model.discriminator_l_op(x_samples)
+x_samples = trim_32_to_28(model_eval.decode(tf.reshape(samples, [-1, config.get('z_dim')]).eval()))
+l_samples = model_eval.discriminator_l(x_samples.eval())
 x_samples = tf.reshape(x_samples, [num_samples, inference_batch_size, 784])
 l_samples = tf.reshape(l_samples, [num_samples, inference_batch_size, 1024])
 x_ad_tensor = tf.constant(x_ad)
@@ -142,6 +149,7 @@ l_ad_tensor = model.discriminator_l_op(x_ad_tensor)
 # vae_recon = trim_32_to_28(model.decode_op(tf.slice(model.encode_op(
 #     tf.concat([x_ad_tensor, tf.zeros([(32 - inference_batch_size % 32), 784])], 0)),
 #     [0, 0], [inference_batch_size % 32, config.get('z_dim')])))
+vae_recon = trim_32_to_28(model_eval.reconstruct(x_ad))
 vae_l2_loss = l2_loss(x_ad_tensor, vae_recon)
 vae_recon_loss = recon_loss(x_ad_tensor, vae_recon)
 vae_latent_loss = l_latent_loss(l_ad_tensor, model.discriminator_l_op(vae_recon))
