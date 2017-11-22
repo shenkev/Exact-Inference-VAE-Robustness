@@ -7,6 +7,8 @@ import tensorflow.contrib.slim as slim
 import layers
 import model, utils
 
+log2pi = tf.log(2.0 * np.pi)
+
 
 class Model(model.GenerativeModelBase):
     """VAE-GAN model."""
@@ -39,13 +41,18 @@ class Model(model.GenerativeModelBase):
 
         # Reshape input as needed.
         x, width, height = layers.pad_power2(x, self.width, self.height, self.channels)
+
+
         x_IW = tf.tile(x,tf.constant([num_IW_samples,1]))
+
+
         # Normal distribution for GAN sampling.
-        z_p = tf.random_normal([self.batch_size, self.latent_dim], 0, 1)
-        z_p_IW = tf.random_normal([self.batch_size*num_IW_samples, self.latent_dim], 0, 1)
+        # z_p = tf.random_normal([self.batch_size, self.latent_dim], 0, 1)
+        z_p_IW = tf.random_normal([self.batch_size* num_IW_samples,self.latent_dim], 0, 1)
+
         # Normal distribution for VAE sampling.
-        eps = tf.random_normal([self.batch_size, self.latent_dim], 0, 1)
-        eps_IW = tf.random_normal([self.batch_size*num_IW_samples, self.latent_dim], 0, 1)
+        # eps = tf.random_normal([self.batch_size, self.latent_dim], 0, 1)
+        eps_IW = tf.random_normal([self.batch_size* num_IW_samples,self.latent_dim], 0, 1)
 
 
         with slim.arg_scope([layers.encoder, layers.decoder, layers.discriminator],
@@ -57,11 +64,15 @@ class Model(model.GenerativeModelBase):
             # Get latent representation for sampling.
             # z_x_mean, z_x_log_sigma_sq = layers.encoder(x)
             z_x_mean_IW, z_x_log_sigma_sq_IW = layers.encoder(x_IW)
+            # z_x_mean_IW = tf.reshape(z_x_mean_IW,[self.batch_size, num_IW_samples,self.latent_dim])
+            # z_x_log_sigma_sq_IW = tf.reshape(z_x_log_sigma_sq_IW,[self.batch_size, num_IW_samples,self.latent_dim])
+
 
             std_dev = tf.sqrt(tf.exp(z_x_log_sigma_sq_IW))
             z_x = z_x_mean_IW + eps_IW*std_dev
-            print("THIS IS Z_X")
+            print("THIS IS Z_X!")
             print(z_x)
+
 
             # Sample from latent space.
             # z_x = []
@@ -102,6 +113,11 @@ class Model(model.GenerativeModelBase):
                 )
 
                 return log_likelihood
+
+            print("LETS SEE HARRIS")
+            log_q_z = gaussian_likelihood(z_x,z_x_mean_IW,z_x_log_sigma_sq_IW)
+            log_q_z = tf.reshape(log_q_z,[self.batch_size,num_IW_samples])
+            print(log_q_z)
 
 
             # Generate output.
