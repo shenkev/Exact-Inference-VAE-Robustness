@@ -65,70 +65,70 @@ with report.add_time_block('time_model_reconstruct_originals'):
 utils.plot_digits(mnist_wrapper_object, '{}-{}-reconstructions'.format(mnist_wrapper_object.name, model.name),
                   original_reconstructions, n=10)
 
-# =============================== INFERENCE ====================================
-inference_batch_size = 100
-start_ind = 0
+# # =============================== INFERENCE ====================================
+# inference_batch_size = 100
+# start_ind = 0
 
-f = open("./adversarial_examples_v0.pckl", 'rb')
-attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
-f.close()
+# f = open("./adversarial_examples_v0.pckl", 'rb')
+# attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
+# f.close()
 
-attack_set = attack_set[start_ind:]
-attack_set_labels = attack_set_labels[start_ind:]
-adversarial_examples = adversarial_examples[start_ind:]
-adversarial_targets = adversarial_targets[start_ind:]
+# attack_set = attack_set[start_ind:]
+# attack_set_labels = attack_set_labels[start_ind:]
+# adversarial_examples = adversarial_examples[start_ind:]
+# adversarial_targets = adversarial_targets[start_ind:]
 
-x_ad = adversarial_examples[0:inference_batch_size]
+# x_ad = adversarial_examples[0:inference_batch_size]
 
-for i in range(x_ad.shape[0]):
-    plot_save(attack_set[i].reshape(1, 784), # first number is sample number
-              './out/{}_x_gt_label_{}_target{}.png'.format(str(start_ind+i+1).zfill(3), attack_set_labels[i], adversarial_targets[i]))
-    plot_save(x_ad[i].reshape(1, 784),
-              './out/{}_x_adversarial.png'.format(str(start_ind+i+1).zfill(3)))
+# for i in range(x_ad.shape[0]):
+#     plot_save(attack_set[i].reshape(1, 784), # first number is sample number
+#               './out/{}_x_gt_label_{}_target{}.png'.format(str(start_ind+i+1).zfill(3), attack_set_labels[i], adversarial_targets[i]))
+#     plot_save(x_ad[i].reshape(1, 784),
+#               './out/{}_x_adversarial.png'.format(str(start_ind+i+1).zfill(3)))
 
 
-config = {
-    'model': 'hmc',
-    'inference_batch_size': inference_batch_size,
-    'T': 15000,
-    'img_dim': 28,
-    'step_size': None,
-    'leapfrog_steps': None,
-    'friction': None,
-    'z_dim': 50,
-    'likelihood_variance': 0.48,
-    'useDiscL': False,
-    'keep_ratio': 0.05,
-    'img_num': 0,
-    'sample_to_vis': 3
-}
+# config = {
+#     'model': 'hmc',
+#     'inference_batch_size': inference_batch_size,
+#     'T': 15000,
+#     'img_dim': 28,
+#     'step_size': None,
+#     'leapfrog_steps': None,
+#     'friction': None,
+#     'z_dim': 50,
+#     'likelihood_variance': 0.48,
+#     'useDiscL': False,
+#     'keep_ratio': 0.05,
+#     'img_num': 0,
+#     'sample_to_vis': 3
+# }
 
-# Hack this shit
-tf.logging.set_verbosity(tf.logging.ERROR)
-model._training = tf.constant([False])
+# # Hack this shit
+# tf.logging.set_verbosity(tf.logging.ERROR)
+# model._training = tf.constant([False])
 
-qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, model.discriminator_l_op)
+# qz, qz_kept = run_experiment(model.decode_op, model.encode_op, x_ad, config, model.discriminator_l_op)
 
-num_samples = 40
-samples_to_check = qz_kept.sample(num_samples).eval()
+# num_samples = 40
+# samples_to_check = qz_kept.sample(num_samples).eval()
 
-f = open('log.txt', 'ab')
-for i in range(inference_batch_size):
-    config['img_num'] = str(start_ind+i+1).zfill(3)
-    best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss, \
-    vae_recon_loss, vae_l2_loss, vae_latent_loss\
-        = compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op,
-                               x_ad[i:i+1], samples_to_check[:, i, :], config)
+# f = open('log.txt', 'ab')
+# for i in range(inference_batch_size):
+#     config['img_num'] = str(start_ind+i+1).zfill(3)
+#     best_recon_loss, average_recon_loss, best_l2_loss, average_l2_loss, best_latent_loss, average_latent_loss, \
+#     vae_recon_loss, vae_l2_loss, vae_latent_loss\
+#         = compare_vae_hmc_loss(model.decode_op, model.encode_op, model.discriminator_l_op,
+#                                x_ad[i:i+1], samples_to_check[:, i, :], config)
 
-    print ("---------- Summary Image {} ------------".format(start_ind+i+1), file=f)
-    print("VAE recon loss: " + str(vae_recon_loss), file=f)
-    print("VAE L2 loss: " + str(vae_l2_loss), file=f)
-    print("VAE latent loss: " + str(vae_latent_loss), file=f)
-    print("Best mcmc recon loss: " + str(best_recon_loss), file=f)
-    print("Best mcmc L2 loss: " + str(best_l2_loss), file=f)
-    print("Best mcmc latent loss: " + str(best_latent_loss), file=f)
-    print("Average mcmc recon loss: " + str(average_recon_loss), file=f)
-    print("Average mcmc l2 loss " + str(average_l2_loss), file=f)
-    print("Average mcmc latent loss " + str(average_latent_loss), file=f)
+#     print ("---------- Summary Image {} ------------".format(start_ind+i+1), file=f)
+#     print("VAE recon loss: " + str(vae_recon_loss), file=f)
+#     print("VAE L2 loss: " + str(vae_l2_loss), file=f)
+#     print("VAE latent loss: " + str(vae_latent_loss), file=f)
+#     print("Best mcmc recon loss: " + str(best_recon_loss), file=f)
+#     print("Best mcmc L2 loss: " + str(best_l2_loss), file=f)
+#     print("Best mcmc latent loss: " + str(best_latent_loss), file=f)
+#     print("Average mcmc recon loss: " + str(average_recon_loss), file=f)
+#     print("Average mcmc l2 loss " + str(average_l2_loss), file=f)
+#     print("Average mcmc latent loss " + str(average_latent_loss), file=f)
 
-f.close()
+# f.close()
