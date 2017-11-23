@@ -27,6 +27,7 @@ class Model(model.GenerativeModelBase):
         'd_x',
         'l_x',
         'd_x_p',
+        'objective',
     ])
 
     @property
@@ -111,7 +112,7 @@ class Model(model.GenerativeModelBase):
                 """Log-likelihood of data given ~ N(0, 1)
                 Parameters
                 ----------
-                data : 
+                data :
                     Samples from Guassian centered at 0
                 Returns
                 -------
@@ -132,14 +133,14 @@ class Model(model.GenerativeModelBase):
             print(log_q_z)
 
             log_p_z = standard_gaussian_likelihood(z_x)
-            
+
             mean_decoder = layers.decoder(z_x)
             # Bernoulli log-likelihood reconstruction
             # TODO: other distributon types
             def bernoulli_log_joint(x):
                 return tf.reduce_sum(
                     (x * tf.log(tol + mean_decoder))
-                        + ((1 - x) * tf.log(tol + 1 - mean_decoder)), 
+                        + ((1 - x) * tf.log(tol + 1 - mean_decoder)),
                     1)
 
             log_p_given_z = bernoulli_log_joint(x_IW)
@@ -156,6 +157,19 @@ class Model(model.GenerativeModelBase):
 
             # Use the log-sum-exp trick to compute the total weights
             log_weights_max =  tf.reduce_max(log_weights, 1, keep_dims=True)
+
+            weights_iw =  tf.log(tf.reduce_mean(tf.exp(log_weights - log_weights_max), 1))
+            objective = tf.reduce_mean(log_weights_max) + tf.reduce_mean(weights_iw)
+
+
+            print("OBJECTIVE!")
+            print(objective)
+
+
+
+
+
+
             log_weights_total = log_weights_max + tf.log(tf.reduce_sum(tf.exp(log_weights - log_weights_max), 1, keep_dims=True))
             log_weights_norm = log_weights - log_weights_total
 
@@ -177,7 +191,7 @@ class Model(model.GenerativeModelBase):
                 print("shape test")
                 print(x)
                 print(x_tilde)
-            
+
             _, l_x_tilde = layers.discriminator(x_tilde)
 
             with tf.variable_scope(tf.get_variable_scope(), reuse=True):
@@ -204,6 +218,7 @@ class Model(model.GenerativeModelBase):
                 l_x_tilde=l_x_tilde,
                 d_x=d_x,
                 d_x_p=d_x_p,
+                objective = objective,
             )
 
     def _build_optimizer(self):
@@ -244,7 +259,8 @@ class Model(model.GenerativeModelBase):
         LL_loss = tf.reduce_sum(tf.square(model.l_x - model.l_x_tilde)) / model.width / model.height / self.channels
 
         # Calculate the losses specific to encoder, decoder, discriminator.
-        L_e = tf.clip_by_value(KL_loss + LL_loss, -100, 100)
+        # L_e = tf.clip_by_value(KL_loss + LL_loss, -100, 100)
+        L_e = tf.clip_by_value(model.objective + LL_loss, -100, 100)
         L_g = tf.clip_by_value(LL_loss + G_loss, -100, 100)
         L_d = tf.clip_by_value(D_loss, -100, 100)
 
