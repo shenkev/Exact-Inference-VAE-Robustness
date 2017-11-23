@@ -99,7 +99,7 @@ start_ind = int(os.environ['image_index'])  # don't exceed 448 for inference_bat
 
 num_samples = 96  # how many hmc samples to check over to find the best one
 sample_to_vis = 3  # how many hmc samples to plot per ground truth image
-log_name = 'log.txt'
+log_name = str(os.environ['log_name'])
 T = 5000  # how many inference steps to do
 
 
