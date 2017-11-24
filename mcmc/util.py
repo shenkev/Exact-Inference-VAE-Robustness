@@ -2,6 +2,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import numpy as np
 
 def plot(samples):
     fig = plt.figure(figsize=(4, 4))
@@ -20,6 +21,7 @@ def plot(samples):
 
 
 def plot_save(samples, name):
+    np.savetxt(name + '.txt', samples, fmt='%10.6f')
     plot(samples)
-    plt.savefig(name, bbox_inches='tight')
+    plt.savefig(name + '.png', bbox_inches='tight')
     plt.close()
