@@ -21,7 +21,7 @@ def plot(samples):
 
 
 def plot_save(samples, name):
-    np.savetxt(name + '.txt', samples, fmt='%10.6f')
+    np.savetxt('./numpyfiles/' + name + '.txt', samples, fmt='%10.10f')
     plot(samples)
-    plt.savefig(name + '.png', bbox_inches='tight')
+    plt.savefig('./out/' + name + '.png', bbox_inches='tight')
     plt.close()

@@ -117,9 +117,9 @@ x_ad = adversarial_examples[0:inference_batch_size]
 
 for i in range(x_ad.shape[0]):
     plot_save(attack_set[i].reshape(1, 784), # first number is sample number
-              './out/{}_x_gt_label_{}_target{}.png'.format(str(start_ind+i+1).zfill(3), attack_set_labels[i], adversarial_targets[i]))
+              '{}_x_gt_label_{}_target{}'.format(str(start_ind+i+1).zfill(3), attack_set_labels[i], adversarial_targets[i]))
     plot_save(x_ad[i].reshape(1, 784),
-              './out/{}_x_adversarial.png'.format(str(start_ind+i+1).zfill(3)))
+              '{}_x_adversarial'.format(str(start_ind+i+1).zfill(3)))
 
 
 config = {
@@ -180,9 +180,9 @@ f = open(log_name, 'ab')
 for i in tqdm(range(inference_batch_size)):
     img_num = str(start_ind+i+1).zfill(3)
     for j in range(sample_to_vis):
-        plot_save(x_samples[j:j+1, i], './out/{}_mcmc_sample_{}.png'.format(img_num, j + 1))
+        plot_save(x_samples[j:j+1, i], '{}_mcmc_sample_{}'.format(img_num, j + 1))
 
-    plot_save(mean_imgs[i:i+1], './out/{}_mcmcMean.png'.format(img_num))
+    plot_save(mean_imgs[i:i+1], '{}_mcmcMean'.format(img_num))
 
     best_recon_loss = recon_losses[min_recon[i], i]
     best_l2_loss = l2_losses[min_l2[i], i]
@@ -202,10 +202,10 @@ for i in tqdm(range(inference_batch_size)):
     print ("Average mcmc l2 loss " + str(avg_l2_loss[i]))
     print ("Average mcmc latent loss " + str(avg_latent_loss[i]))
 
-    plot_save(vae_recon[i:i+1], './out/{}_vae_recon.png'.format(img_num))
-    plot_save(best_recon_sample, './out/{}_best_recon.png'.format(img_num))
-    plot_save(best_l2_sample, './out/{}_best_l2.png'.format(img_num))
-    plot_save(best_latent_sample, './out/{}_best_latent.png'.format(img_num))
+    plot_save(vae_recon[i:i+1], '{}_vae_recon'.format(img_num))
+    plot_save(best_recon_sample, '{}_best_recon'.format(img_num))
+    plot_save(best_l2_sample, '{}_best_l2'.format(img_num))
+    plot_save(best_latent_sample, '{}_best_latent'.format(img_num))
 
     print ("---------- Summary Image {} ------------".format(start_ind+i+1), file=f)
     print("VAE recon loss: " + str(vae_recon_loss[i]), file=f)
