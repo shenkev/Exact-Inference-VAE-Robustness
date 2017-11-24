@@ -47,8 +47,11 @@ model.build()
 model_sample_reconstructions = 0
 model.set_defaults(reconstruction={'sampling': model_sample_reconstructions})
 
-checkpoint = 'models/mnist-vae-gan-v0.weights.tfmod'
-model.load(checkpoint)
+# checkpoint = 'models/mnist-vae-gan-v0.weights.tfmod'
+# model.load(checkpoint)
+
+model.train(mnist_dataset,epochs=1)
+print('trained!')
 
 # Try to reconstruct same test images using model to make sure model loaded properly
 test_set, test_set_labels = mnist_dataset.test.images[:128], mnist_dataset.test.labels[:128]
