@@ -131,7 +131,7 @@ config = {
     'leapfrog_steps': None,
     'friction': None,
     'z_dim': 50,
-    'likelihood_variance': 0.48,
+    'likelihood_variance': 0.54,
     'useDiscL': False,
     'keep_ratio': 0.05
 }
