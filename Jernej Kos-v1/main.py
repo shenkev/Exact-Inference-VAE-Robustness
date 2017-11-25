@@ -51,6 +51,7 @@ dataset_class.add_options(parser)
 
 # Model options.
 parser.add_argument('--model-resume', action='store_true')
+parser.add_argument('--model-use-checkpoint', action='store_true') # For using checkpoint to load decoder (and other weights that will be retrained)
 parser.add_argument('--model-no-train', action='store_false', dest='model_train')
 parser.add_argument('--model-train-epochs', type=int, default=100)
 parser.add_argument('--model-checkpoint-every', type=int, default=10)
@@ -149,6 +150,13 @@ print('Building model "{}".'.format(model.name))
 model.build()
 model.set_defaults(reconstruction={'sampling': args.model_sample_reconstructions})
 
+if args.model_use_checkpoint:
+    original_checkpoint = os.path.join(args.model_dir, '{}-{}-original.weights.tfmod'.format(dataset.name, model.name)) # Original Name
+else:
+    original_checkpoint = None
+
+print("Original checkpoint: {}".format(original_checkpoint))
+
 checkpoint = os.path.join(args.model_dir, '{}-{}.weights.tfmod'.format(dataset.name, model.name))
 
 if args.model_resume or args.only_existing:
@@ -161,7 +169,9 @@ if args.model_train and not args.only_existing:
         model.train(
             data_sets,
             epochs=args.model_train_epochs,
-            checkpoint=checkpoint,
+            # checkpoint=checkpoint,
+            original_checkpoint=original_checkpoint,
+            new_model_checkpoint=checkpoint,
             checkpoint_every=args.model_checkpoint_every,
         )
 
@@ -249,7 +259,8 @@ if args.classifier_train and not args.only_existing:
         classifier.train(
             data_sets,
             epochs=args.classifier_train_epochs,
-            checkpoint=checkpoint,
+            # checkpoint=checkpoint,
+            new_model_checkpoint=checkpoint,
             checkpoint_every=args.classifier_checkpoint_every,
         )
 

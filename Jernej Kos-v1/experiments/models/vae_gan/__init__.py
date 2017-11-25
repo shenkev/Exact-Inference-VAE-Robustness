@@ -34,7 +34,7 @@ class Model(model.GenerativeModelBase):
     def output_dimensions(self):
         return layers.get_dimensions(self.width, self.height)
 
-    def _build(self, x, sample=5):
+    def _build(self, x, sample=10):
         """Builds the model."""
         print("WHAT THE FUCKK")
         num_IW_samples = sample
@@ -273,7 +273,8 @@ class Model(model.GenerativeModelBase):
     def _build_apply_gradients(self, optimizers, gradients, global_step):
         operations = []
         for name, optimizer in zip(['encoder', 'decoder', 'discriminator'], optimizers):
-            operations.append(optimizer.apply_gradients(gradients[name], global_step=global_step))
+            if name != 'decoder':
+                operations.append(optimizer.apply_gradients(gradients[name], global_step=global_step))
 
         return tf.group(*operations)
 
