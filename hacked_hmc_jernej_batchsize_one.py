@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 
+import pdb
 import numpy as np
 import tensorflow as tf
 import edward as ed
@@ -175,6 +176,9 @@ min_recon = np.argmin(recon_losses, axis=0)
 avg_recon_loss = np.mean(recon_losses, axis=0)
 min_latent = np.argmin(l_latent_losses, axis=0)
 avg_latent_loss = np.mean(l_latent_losses, axis=0)
+
+with open('./numpyfiles/{}_z.pckl'.format(str(start_ind+1).zfill(3)), 'wb') as f:
+    pickle.dump([qz.params.eval(), samples.eval(), min_l2, min_recon, min_latent ], f)
 
 f = open(log_name, 'ab')
 for i in tqdm(range(inference_batch_size)):

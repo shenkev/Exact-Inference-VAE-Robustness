@@ -1,4 +1,4 @@
-for i in $(seq 0 2)
+for i in $(seq 0 199)
 do
    export log_name='log.txt'
    export image_index=$i
