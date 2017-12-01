@@ -50,6 +50,30 @@ model.set_defaults(reconstruction={'sampling': model_sample_reconstructions})
 checkpoint = 'models/mnist-vae-gan-v0.weights.tfmod'
 model.load(checkpoint)
 
+# ========================= TEST FOR FREEZING DECODER ==========================
+
+print("Decoder weights before training:")
+decoder = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model-vae-gan/decoder')
+print(decoder[0], decoder[0].eval())
+
+print("Encoder weights before training:")
+encoder = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model-vae-gan/encoder')
+print(encoder[0], encoder[0].eval())
+
+model.train(
+    mnist_dataset,
+    epochs=1,
+    original_checkpoint='models/mnist-vae-gan-v0.weights.tfmod',
+    new_model_checkpoint='models/mnist-vae-gan-v1.weights.tfmod'
+)
+
+print("Decoder weights after training:")
+print(decoder[0], decoder[0].eval())
+print("Encoder weights after training:")
+print(encoder[0], encoder[0].eval())
+
+# ==============================================================================
+
 # Try to reconstruct same test images using model to make sure model loaded properly
 test_set, test_set_labels = mnist_dataset.test.images[:128], mnist_dataset.test.labels[:128]
 

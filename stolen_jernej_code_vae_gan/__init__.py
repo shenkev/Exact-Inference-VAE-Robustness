@@ -143,7 +143,8 @@ class Model(model.GenerativeModelBase):
     def _build_apply_gradients(self, optimizers, gradients, global_step):
         operations = []
         for name, optimizer in zip(['encoder', 'decoder', 'discriminator'], optimizers):
-            operations.append(optimizer.apply_gradients(gradients[name], global_step=global_step))
+            if name != 'decoder':
+                operations.append(optimizer.apply_gradients(gradients[name], global_step=global_step))
 
         return tf.group(*operations)
 
