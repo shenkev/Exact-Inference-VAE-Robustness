@@ -1,5 +1,5 @@
 start=`date +%s`
-for i in $(seq 150 199)
+for i in $(seq 0 199)
 do
    export log_name='log0.txt'
    export image_index=$i
