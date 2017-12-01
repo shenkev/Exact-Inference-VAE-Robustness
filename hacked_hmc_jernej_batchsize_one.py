@@ -105,7 +105,7 @@ T = 5000  # how many inference steps to do
 
 
 print ("Loading adversarial examples and plotting them...")
-f = open("./adversarial_examples_v0.pckl", 'rb')
+f = open("./adversarial_examples/adversarial_examples_v0_target_4.pckl", 'rb')
 attack_set, attack_set_labels, adversarial_examples, adversarial_targets = pickle.load(f)
 f.close()
 
