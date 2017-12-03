@@ -1,5 +1,5 @@
 start=`date +%s`
-for i in $(seq 912 991)
+for i in $(seq 800 991)
 do
    export log_name='log800.txt'
    export image_index=$i
