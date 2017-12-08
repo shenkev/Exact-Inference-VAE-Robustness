@@ -18,8 +18,8 @@ class Attack(attack.AttackBase):
     @classmethod
     def add_options(cls, parser):
         """Augment program arguments."""
-        parser.add_argument('--optimization-lambda', type=float, default=1.0)
-        parser.add_argument('--optimization-epochs', type=int, default=100)
+        parser.add_argument('--optimization-lambda', type=float, default=0.001)
+        parser.add_argument('--optimization-epochs', type=int, default=1000)
         parser.add_argument('--optimization-lr', type=float, default=0.1)
 
     def _build_attack(self, x, y):

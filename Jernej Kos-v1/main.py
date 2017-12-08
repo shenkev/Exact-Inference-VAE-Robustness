@@ -93,7 +93,7 @@ np.random.seed(args.seed)
 tf.set_random_seed(args.seed)
 
 # Setup reporting.
-report_filename = 'report-{}.txt'.format(args.version) if args.version else 'report.txt'
+report_filename = 'report-{}-target-{}.txt'.format(args.version, args.attack_target) if args.version else 'report.txt'
 report = Report('results/' + report_filename)
 report.extend(vars(args))
 report.add("Available GPUs", len(utils.get_available_gpus()))
@@ -284,7 +284,7 @@ if args.attack_generate_examples:
         print('ERROR: Attack produced adversarial examples with NaN values!')
         exit(1)
 
-    f = open('adversarial_examples_{}.pckl'.format(args.version), 'wb')
+    f = open('adversarial_examples_{}_target_{}.pckl'.format(args.version, args.attack_target), 'wb')
     pickle.dump([attack_set, attack_set_labels, adversarial_examples, adversarial_targets], f)
     f.close()
 else:
@@ -293,7 +293,7 @@ else:
     f.close()
 
 adversarial_reconstructions = model.reconstruct(adversarial_examples)
-f = open('adversarial_reconstructions_{}.pckl'.format(args.version), 'wb')
+f = open('adversarial_reconstructions_{}_target_{}.pckl'.format(args.version, args.attack_target), 'wb')
 pickle.dump([attack_set, attack_set_labels, adversarial_examples, adversarial_targets, adversarial_reconstructions], f)
 f.close()
 
@@ -410,155 +410,155 @@ if attack.targeted:
     report.add('loop0_adversarial_targeted_matching_rate', rate)
 
 
-def reconstruction_loops(model, index=None):
-    if index is not None:
-        prefix = '{}-{}-{}-{}-ensemble-{}'.format(dataset.name, model.name, classifier.name, attack.name, index)
-        report_prefix = 'loop{{}}_adversarial_{}'.format(index)
-    else:
-        prefix = '{}-{}-{}-{}'.format(dataset.name, model.name, classifier.name, attack.name)
-        report_prefix = 'loop{}_adversarial'
+# def reconstruction_loops(model, index=None):
+#     if index is not None:
+#         prefix = '{}-{}-{}-{}-ensemble-{}'.format(dataset.name, model.name, classifier.name, attack.name, index)
+#         report_prefix = 'loop{{}}_adversarial_{}'.format(index)
+#     else:
+#         prefix = '{}-{}-{}-{}'.format(dataset.name, model.name, classifier.name, attack.name)
+#         report_prefix = 'loop{}_adversarial'
 
-    adversarial_reconstructions = model.reconstruct(adversarial_examples)
+#     adversarial_reconstructions = model.reconstruct(adversarial_examples)
 
-    utils.plot_digits(dataset, '{}-adversarial-reconstructions'.format(prefix),
-                      adversarial_reconstructions, n=10)
+#     utils.plot_digits(dataset, '{}-adversarial-reconstructions'.format(prefix),
+#                       adversarial_reconstructions, n=10)
 
-    utils.plot_digits(dataset, '{}-adversarial-reconstructions-labels'.format(prefix),
-                      adversarial_reconstructions, n=10, labels=(attack_set_labels, predictions))
+#     utils.plot_digits(dataset, '{}-adversarial-reconstructions-labels'.format(prefix),
+#                       adversarial_reconstructions, n=10, labels=(attack_set_labels, predictions))
 
-    # Feed reconstructed versions back to the model and assess accuracy.
-    result = {}
-    for loop in xrange(args.attack_reconstruct_loops):
-        result[loop] = {}
-        if index is not None:
-            result[loop]['model_predictions'] = classifier.classifiers[index].predict(
-                utils.crop_for_model(model, adversarial_reconstructions))
+#     # Feed reconstructed versions back to the model and assess accuracy.
+#     result = {}
+#     for loop in xrange(args.attack_reconstruct_loops):
+#         result[loop] = {}
+#         if index is not None:
+#             result[loop]['model_predictions'] = classifier.classifiers[index].predict(
+#                 utils.crop_for_model(model, adversarial_reconstructions))
 
-        predictions_2nd = classifier.predict(utils.crop_for_model(model, adversarial_reconstructions))
-        if attack.targeted:
-            filtered_predictions_2nd = predictions_2nd[different_target_indices]
-        else:
-            filtered_predictions_2nd = predictions_2nd
+#         predictions_2nd = classifier.predict(utils.crop_for_model(model, adversarial_reconstructions))
+#         if attack.targeted:
+#             filtered_predictions_2nd = predictions_2nd[different_target_indices]
+#         else:
+#             filtered_predictions_2nd = predictions_2nd
 
-        incorrect_indices = (filtered_predictions_2nd != filtered_labels)
-        correct = np.sum(filtered_predictions_2nd == filtered_labels)
-        count = filtered_labels.shape[0]
-        accuracy = np.mean(filtered_predictions_2nd == filtered_labels)
+#         incorrect_indices = (filtered_predictions_2nd != filtered_labels)
+#         correct = np.sum(filtered_predictions_2nd == filtered_labels)
+#         count = filtered_labels.shape[0]
+#         accuracy = np.mean(filtered_predictions_2nd == filtered_labels)
 
-        print('Loop', loop + 1)
-        print('[{}] Classifier accuracy on reconstructed adversarial examples: {}/{} ({})'.format(
-              index or '0', correct, count, accuracy))
+#         print('Loop', loop + 1)
+#         print('[{}] Classifier accuracy on reconstructed adversarial examples: {}/{} ({})'.format(
+#               index or '0', correct, count, accuracy))
 
-        if attack.targeted:
-            incorrect, matching, rate = utils.get_matching_rate(
-                filtered_labels, filtered_predictions_2nd, filtered_targets)
-            print('[{}] Targeted attack matching rate: {}/{} ({})'.format(index or '0', matching, incorrect, rate))
+#         if attack.targeted:
+#             incorrect, matching, rate = utils.get_matching_rate(
+#                 filtered_labels, filtered_predictions_2nd, filtered_targets)
+#             print('[{}] Targeted attack matching rate: {}/{} ({})'.format(index or '0', matching, incorrect, rate))
 
-            report.add('{}_targeted_incorrect'.format(report_prefix.format(loop + 1)), incorrect)
-            report.add('{}_targeted_matching'.format(report_prefix.format(loop + 1)), matching)
-            report.add('{}_targeted_matching_rate'.format(report_prefix.format(loop + 1)), rate)
+#             report.add('{}_targeted_incorrect'.format(report_prefix.format(loop + 1)), incorrect)
+#             report.add('{}_targeted_matching'.format(report_prefix.format(loop + 1)), matching)
+#             report.add('{}_targeted_matching_rate'.format(report_prefix.format(loop + 1)), rate)
 
-        report.add('{}_correct'.format(report_prefix.format(loop + 1)), correct)
-        report.add('{}_accuracy'.format(report_prefix.format(loop + 1)), accuracy)
+#         report.add('{}_correct'.format(report_prefix.format(loop + 1)), correct)
+#         report.add('{}_accuracy'.format(report_prefix.format(loop + 1)), accuracy)
 
-        for src_class, correct, count, accuracy, matching_rate in utils.accuracy_combinations(
-                dataset, filtered_labels, filtered_predictions_2nd, filtered_targets):
-            print('[{}] Classifier accuracy on adversarial examples (class={}): {}/{} ({})'.format(
-                  index or '0', src_class, correct, count, accuracy))
-            report.add('{}_src{}_correct'.format(report_prefix.format(loop + 1), src_class), correct)
-            report.add('{}_src{}_count'.format(report_prefix.format(loop + 1), src_class), count)
-            report.add('{}_src{}_accuracy'.format(report_prefix.format(loop + 1), src_class), accuracy)
-            report.add('{}_src{}_matching_rate'.format(report_prefix.format(loop + 1), src_class), matching_rate)
+#         for src_class, correct, count, accuracy, matching_rate in utils.accuracy_combinations(
+#                 dataset, filtered_labels, filtered_predictions_2nd, filtered_targets):
+#             print('[{}] Classifier accuracy on adversarial examples (class={}): {}/{} ({})'.format(
+#                   index or '0', src_class, correct, count, accuracy))
+#             report.add('{}_src{}_correct'.format(report_prefix.format(loop + 1), src_class), correct)
+#             report.add('{}_src{}_count'.format(report_prefix.format(loop + 1), src_class), count)
+#             report.add('{}_src{}_accuracy'.format(report_prefix.format(loop + 1), src_class), accuracy)
+#             report.add('{}_src{}_matching_rate'.format(report_prefix.format(loop + 1), src_class), matching_rate)
 
-        adversarial_reconstructions = model.reconstruct(
-            utils.crop_for_model(model, adversarial_reconstructions))
+#         adversarial_reconstructions = model.reconstruct(
+#             utils.crop_for_model(model, adversarial_reconstructions))
 
-        if attack.targeted:
-            filtered_reconstructions = adversarial_reconstructions[different_target_indices]
-        else:
-            filtered_reconstructions = adversarial_reconstructions
+#         if attack.targeted:
+#             filtered_reconstructions = adversarial_reconstructions[different_target_indices]
+#         else:
+#             filtered_reconstructions = adversarial_reconstructions
 
-        utils.plot_digits(dataset, '{}-adversarial-reconstructions-loop-{}'.format(prefix, loop + 1),
-                          adversarial_reconstructions, n=10)
+#         utils.plot_digits(dataset, '{}-adversarial-reconstructions-loop-{}'.format(prefix, loop + 1),
+#                           adversarial_reconstructions, n=10)
 
-        utils.plot_digits(dataset, '{}-adversarial-reconstructions-loop-{}-incorrect'.format(prefix, loop + 1),
-                          filtered_reconstructions[incorrect_indices], n=10)
+#         utils.plot_digits(dataset, '{}-adversarial-reconstructions-loop-{}-incorrect'.format(prefix, loop + 1),
+#                           filtered_reconstructions[incorrect_indices], n=10)
 
-        result[loop]['reconstructions'] = adversarial_reconstructions
-        result[loop]['predictions'] = predictions_2nd
+#         result[loop]['reconstructions'] = adversarial_reconstructions
+#         result[loop]['predictions'] = predictions_2nd
 
-    return result
+#     return result
 
-results = {}
-results[0] = reconstruction_loops(model)
+# results = {}
+# results[0] = reconstruction_loops(model)
 
-# Generate plots.
-predictions_loop1 = results[0][0]['predictions']
-predictions_loop2 = results[0][1]['predictions']
-reconstructions_loop1 = results[0][0]['reconstructions']
-indices_wrong = (predictions_loop1 != attack_set_labels)
-if attack.targeted:
-    indices_notarget = (attack_set_labels != adversarial_targets)
-    indices_wrong &= indices_notarget
-else:
-    indices_notarget = None
+# # Generate plots.
+# predictions_loop1 = results[0][0]['predictions']
+# predictions_loop2 = results[0][1]['predictions']
+# reconstructions_loop1 = results[0][0]['reconstructions']
+# indices_wrong = (predictions_loop1 != attack_set_labels)
+# if attack.targeted:
+#     indices_notarget = (attack_set_labels != adversarial_targets)
+#     indices_wrong &= indices_notarget
+# else:
+#     indices_notarget = None
 
-prefix = '{}-{}-{}-{}'.format(dataset.name, model.name, classifier.name, attack.name)
+# prefix = '{}-{}-{}-{}'.format(dataset.name, model.name, classifier.name, attack.name)
 
-attack_set_reconstructions = model.reconstruct(attack_set)
-attack_set_reconstructions_sample_1 = model.reconstruct(attack_set, sample=True, sample_times=1)
-attack_set_reconstructions_sample_12 = model.reconstruct(attack_set, sample=True, sample_times=12)
-attack_set_reconstructions_sample_50 = model.reconstruct(attack_set, sample=True, sample_times=50)
-adversarial_reconstructions = model.reconstruct(adversarial_examples)
-adversarial_reconstructions_sample_1 = model.reconstruct(adversarial_examples, sample=True, sample_times=1)
-adversarial_reconstructions_sample_12 = model.reconstruct(adversarial_examples, sample=True, sample_times=12)
-adversarial_reconstructions_sample_50 = model.reconstruct(adversarial_examples, sample=True, sample_times=50)
+# attack_set_reconstructions = model.reconstruct(attack_set)
+# attack_set_reconstructions_sample_1 = model.reconstruct(attack_set, sample=True, sample_times=1)
+# attack_set_reconstructions_sample_12 = model.reconstruct(attack_set, sample=True, sample_times=12)
+# attack_set_reconstructions_sample_50 = model.reconstruct(attack_set, sample=True, sample_times=50)
+# adversarial_reconstructions = model.reconstruct(adversarial_examples)
+# adversarial_reconstructions_sample_1 = model.reconstruct(adversarial_examples, sample=True, sample_times=1)
+# adversarial_reconstructions_sample_12 = model.reconstruct(adversarial_examples, sample=True, sample_times=12)
+# adversarial_reconstructions_sample_50 = model.reconstruct(adversarial_examples, sample=True, sample_times=50)
 
-utils.plot_adversarial_digits(
-    '{}-adversarial-digits-attack'.format(prefix),
-    dataset,
-    model,
-    attack_set,
-    attack_set_reconstructions,
-    attack_set_reconstructions_sample_1,
-    attack_set_reconstructions_sample_12,
-    attack_set_reconstructions_sample_50,
-    adversarial_examples,
-    adversarial_reconstructions,
-    adversarial_reconstructions_sample_1,
-    adversarial_reconstructions_sample_12,
-    adversarial_reconstructions_sample_50,
-    reconstructions_loop1,
-    attack_set_labels,
-    predictions,
-    predictions_loop1,
-    predictions_loop2,
-    target_labels=adversarial_targets if attack.targeted else None,
-    indices=indices_wrong
-)
+# utils.plot_adversarial_digits(
+#     '{}-adversarial-digits-attack'.format(prefix),
+#     dataset,
+#     model,
+#     attack_set,
+#     attack_set_reconstructions,
+#     attack_set_reconstructions_sample_1,
+#     attack_set_reconstructions_sample_12,
+#     attack_set_reconstructions_sample_50,
+#     adversarial_examples,
+#     adversarial_reconstructions,
+#     adversarial_reconstructions_sample_1,
+#     adversarial_reconstructions_sample_12,
+#     adversarial_reconstructions_sample_50,
+#     reconstructions_loop1,
+#     attack_set_labels,
+#     predictions,
+#     predictions_loop1,
+#     predictions_loop2,
+#     target_labels=adversarial_targets if attack.targeted else None,
+#     indices=indices_wrong
+# )
 
-utils.plot_adversarial_digits(
-    '{}-adversarial-digits-all'.format(prefix),
-    dataset,
-    model,
-    attack_set,
-    attack_set_reconstructions,
-    attack_set_reconstructions_sample_1,
-    attack_set_reconstructions_sample_12,
-    attack_set_reconstructions_sample_50,
-    adversarial_examples,
-    adversarial_reconstructions,
-    adversarial_reconstructions_sample_1,
-    adversarial_reconstructions_sample_12,
-    adversarial_reconstructions_sample_50,
-    reconstructions_loop1,
-    attack_set_labels,
-    predictions,
-    predictions_loop1,
-    predictions_loop2,
-    target_labels=adversarial_targets if attack.targeted else None,
-    indices=indices_notarget
-)
+# utils.plot_adversarial_digits(
+#     '{}-adversarial-digits-all'.format(prefix),
+#     dataset,
+#     model,
+#     attack_set,
+#     attack_set_reconstructions,
+#     attack_set_reconstructions_sample_1,
+#     attack_set_reconstructions_sample_12,
+#     attack_set_reconstructions_sample_50,
+#     adversarial_examples,
+#     adversarial_reconstructions,
+#     adversarial_reconstructions_sample_1,
+#     adversarial_reconstructions_sample_12,
+#     adversarial_reconstructions_sample_50,
+#     reconstructions_loop1,
+#     attack_set_labels,
+#     predictions,
+#     predictions_loop1,
+#     predictions_loop2,
+#     target_labels=adversarial_targets if attack.targeted else None,
+#     indices=indices_notarget
+# )
 
 # Plot adversarial examples in latent space.
 if args.model_latent_visualization:
