@@ -276,10 +276,10 @@ if args.attack_generate_examples:
     attack_set = utils.clip_to_batch_size(model_class, data_sets.test.images[:args.attack_set_size])
     attack_set_labels = utils.clip_to_batch_size(model_class, data_sets.test.labels[:args.attack_set_size])
     print('Attacking first {} examples from the test set.'.format(attack_set.shape[0]))
-    
+
     with report.add_time_block('time_attack_generate'):
         adversarial_examples, adversarial_targets = attack.adversarial_examples(attack_set, attack_set_labels)
-    
+
     if np.isnan(adversarial_examples).any():
         print('ERROR: Attack produced adversarial examples with NaN values!')
         exit(1)
