@@ -492,3 +492,183 @@ def plot_latent_space(name, models, count=1000, adversarial=None):
     plt.savefig('results/{}.png'.format(name), bbox_inches='tight', pad_inches=0)
     plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0)
     plt.close()
+
+def plot_latent_space_w_hmc(name, models, count=992, adversarial=None,attack=None,mcmc=None):
+    """Plots a t-SNE visualization of latent space."""
+    from sklearn.manifold import TSNE
+    import matplotlib.pyplot as plt
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
+    # Encode count images from the test set for each model.
+    adversarial_offset = None
+    z_x = []
+    reconstructions = []
+    for model in models:
+        x = model.dataset.get_data().test.images[:count]
+        print('original x')
+        print(x.shape)
+        y = model.dataset.get_data().test.labels[:count]
+        if adversarial is not None:
+            adversarial_offset = x.shape[0]
+            # adversarial_offset = 992
+            print('adversarial shape')
+            print(adversarial.shape)
+            print('x pre concat')
+            print(x.shape)
+            print('adversarial ofset')
+            print(adversarial_offset)
+
+
+            x = np.concatenate([x, adversarial])
+
+            attack_offset = x.shape[0]
+            print('attack offset, {}').format(attack_offset)
+            x = np.concatenate([x, attack])
+            print('x post concat')
+            print(x.shape)
+            mcmc_offset = x.shape[0]
+            print('mcmc offset, {}').format(mcmc_offset)
+
+
+        z_x.append(model.encode(x))
+        reconstructions.append(model.decode(z_x[-1]))
+
+    encodings_per_model = z_x[0].shape[0]
+    # encodings_per_model = 992
+    z_x = np.concatenate(z_x)
+    print('z_x_0')
+    print(z_x.shape)
+
+    print('mcmcshape')
+    print(np.reshape(mcmc,(1,50)).shape)
+
+
+
+    z_x = np.concatenate([z_x,np.reshape(mcmc,(1,50))])
+    print('z_x_0new')
+    print(z_x.shape)
+    reconstructions = np.concatenate(reconstructions)
+
+    def is_background(index):
+        if adversarial is None:
+            return False
+
+        # index = index % encodings_per_model
+        return index < adversarial_offset
+
+    def is_adversarial(index):
+        if adversarial is None:
+            return False
+
+        index = index % encodings_per_model
+        return adversarial_offset<= index <attack_offset
+
+    def is_attack(index):
+        if attack is None:
+            return False
+
+        index = index % encodings_per_model
+        return attack_offset<=index<mcmc_offset
+
+    def is_mcmc(index):
+        if attack is None:
+            return False
+
+        index = index % encodings_per_model
+        return mcmc_offset<=index
+
+    def get_label(index):
+        if len(models) > 1:
+            return '{}/{}'.format(y[index % encodings_per_model], index / encodings_per_model)
+        else:
+            return '{}'.format(y[index % encodings_per_model])
+
+    def latent_dist():
+        return np.sum((z_x[adversarial_offset] - z_x[attack_offset]) ** 2),np.sum((z_x[mcmc_offset] - z_x[attack_offset]) ** 2)
+    print("Latent DISTANCE")
+    print(latent_dist())
+
+
+    print("ATTACK Z")
+    print(z_x[attack_offset])
+
+    print("MCMC Z")
+    print(z_x[mcmc_offset])
+
+    # Compute t-SNE 2D embedding.
+    tsne = TSNE(perplexity=30, n_components=2, init='pca', n_iter=1000)
+    e_x = tsne.fit_transform(z_x)
+
+    # Plot the 2D embedding.
+    # Based on: http://scikit-learn.org/stable/auto_examples/manifold/plot_lle_digits.html
+    x_min, x_max = np.min(e_x, 0), np.max(e_x, 0)
+    e_x = (e_x - x_min) / (x_max - x_min)
+
+    print("e_x[adversarial_offset]:{}").format(e_x[adversarial_offset])
+    print("e_x[attack_offset]:{}").format(e_x[attack_offset])
+    print("e_x[mcmc_offset]:{}").format(e_x[mcmc_offset])
+
+    plt.figure()
+    ax = plt.subplot(111)
+
+    ax.plot(e_x[adversarial_offset, 0], e_x[adversarial_offset, 1], marker='o', color='red', zorder=10)
+    ax.plot(e_x[attack_offset, 0], e_x[attack_offset, 1], marker='o', color='blue', zorder=100)
+    ax.plot(e_x[mcmc_offset, 0], e_x[mcmc_offset, 1], marker='o', color='green', zorder=110)
+
+    for i in range(e_x.shape[0]):
+        # if is_adversarial(i):
+        #     # if (i-adversarial_offset)==0:
+        #
+        #         # ax.plot(e_x[i, 0], e_x[i, 1], marker='o', color='green', zorder=10)
+        #         continue
+        # elif is_attack(i):
+        #     # if (i-attack_offset)==0:
+        #         # ax.plot(e_x[i, 0], e_x[i, 1], marker='o', color='blue', zorder=100)
+        #         continue
+        # elif is_mcmc(i):
+        #     continue
+        #     # print('hi mcmc')
+        #     # if (i-mcmc_offset)==0:
+        #         # print('hi red dot')
+        #         # ax.plot(e_x[i, 0], e_x[i, 1], marker='o', color='red', zorder=110)
+        if is_background(i):
+            # continue
+            ax.text(e_x[i, 0], e_x[i, 1], get_label(i),
+                    color=plt.cm.Set1(y[i % encodings_per_model] / 10.),
+                    fontdict={'weight': 'bold', 'size': 9})
+
+    if models[0].channels == 1:
+        image_shape = [models[0].width, models[0].height]
+    else:
+        image_shape = [models[0].width, models[0].height, models[0].channels]
+
+    # shown_images = np.array([[1., 1.]])
+    # for i in range(e_x.shape[0]):
+    #     if is_adversarial(i) and (i-adversarial_offset)==1:
+    #         image = adversarial[i % encodings_per_model - adversarial_offset]
+    #         # image = adversarial[i % encodings_per_model - adversarial_offset]
+    #     else:
+    #         # image = x[i % encodings_per_model]
+    #         continue
+    #
+    #     dist = np.sum((e_x[i] - shown_images) ** 2, 1)
+    #     if np.min(dist) < 0.00:
+    #         # Don't show points that are too close.
+    #         continue
+    #
+    #     shown_images = np.r_[shown_images, [e_x[i]]]
+    #     imagebox = AnnotationBbox(
+    #         OffsetImage(image.reshape(image_shape), cmap=plt.cm.gray_r, zoom=0.5),
+    #         e_x[i]
+    #     )
+    #     imagebox.set_zorder(11)
+    #     ax.add_artist(imagebox)
+
+    ax.set_frame_on(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    plt.xlim(0, 1.0)
+    plt.ylim(0, 1.0)
+    plt.savefig('results/{}.png'.format(name), bbox_inches='tight', pad_inches=0)
+    # plt.savefig('results/{}.pdf'.format(name), bbox_inches='tight', pad_inches=0)
+    plt.close()
