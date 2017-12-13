@@ -384,11 +384,11 @@ class GenerativeModelBase(ModelBase):
     def _get_labels_placeholder(self, batches=1):
         return None
 
-    def encode_op(self, x, sample=False):
+    def encode_op(self, x, sample=True):
         """Return an operation for encoding an input into a latent representation."""
         raise NotImplementedError
 
-    def encode(self, x, sample=False):
+    def encode(self, x, sample=True):
         """Encode an input into a latent representation."""
         encoder_input, encoder_op = self._cache_op('encoder', self.encode_op, sample=sample)
         return self.batch_apply(encoder_op, feed_dict=self._set_training({encoder_input: x}, False))
@@ -402,11 +402,11 @@ class GenerativeModelBase(ModelBase):
         decoder_input, decoder_op = self._cache_op('decoder', self.decode_op, placeholder='latent')
         return self.batch_apply(decoder_op, feed_dict=self._set_training({decoder_input: z}, False))
 
-    def reconstruct_op(self, x, sample=False, sample_times=1):
+    def reconstruct_op(self, x, sample=False, sample_times=30):
         """Return an operation for reconstructing an input using the model."""
         raise NotImplementedError
 
-    def reconstruct(self, x, sample=True, sample_times=10): # HC: Changed to be default using sampling for now
+    def reconstruct(self, x, sample=True, sample_times=30): # HC: Changed to be default using sampling for now
         """Reconstruct an input using the model."""
         if sample_times is None:
             sample_times = self.defaults['reconstruction'].get('sampling', 0)

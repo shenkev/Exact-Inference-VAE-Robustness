@@ -157,10 +157,9 @@ else:
 
 print("Original checkpoint: {}".format(original_checkpoint))
 
-checkpoint = os.path.join(args.model_dir, '{}-{}.weights.tfmod'.format(dataset.name, model.name))
-
+checkpoint = os.path.join(args.model_dir, '{}-{}-iwae-encFinetune-k30-epoch100.weights.tfmod'.format(dataset.name, model.name)) # HC DEBUG with -iwae-encFinetune name part 
 if args.model_resume or args.only_existing:
-    print('Loading pre-trained model.')
+    print('Loading pre-trained model from: {}.'.format(checkpoint))
     model.load(checkpoint)
 
 if args.model_train and not args.only_existing:

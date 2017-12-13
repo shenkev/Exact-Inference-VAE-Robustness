@@ -34,7 +34,7 @@ class Model(model.GenerativeModelBase):
     def output_dimensions(self):
         return layers.get_dimensions(self.width, self.height)
 
-    def _build(self, x, sample=10):
+    def _build(self, x, sample=30):
         """Builds the model."""
         print("WHAT THE FUCKK")
         num_IW_samples = sample
@@ -143,7 +143,18 @@ class Model(model.GenerativeModelBase):
                         + ((1 - x) * tf.log(tol + 1 - mean_decoder)),
                     1)
 
-            log_p_given_z = bernoulli_log_joint(x_IW)
+            # log_p_given_z = bernoulli_log_joint(x_IW)
+            # HC: Use Lth layer loss for reconstruction rather than bernoulli 
+            d_x, l_x_IW = layers.discriminator(x_IW)
+            with tf.variable_scope(tf.get_variable_scope(), reuse=True):
+                x_tilde_IW = layers.decoder(z_x)
+                _, l_x_tilde_IW = layers.discriminator(x_tilde_IW)
+
+            print("Shape of l_x_IW")
+            print(l_x_IW)
+            # log_p_given_z = -tf.reduce_sum(tf.square(l_x_IW - l_x_tilde_IW), axis=1) / width / height / self.channels
+            # HC: Just use Gaussian on the Lth Layer space with Identity Variance
+            log_p_given_z = gaussian_likelihood(l_x_IW, l_x_tilde_IW, 0.0) # Variance is set to Identity so Log Var = 0
 
             print("Shape of Z_X")
             print(z_x)
@@ -187,9 +198,8 @@ class Model(model.GenerativeModelBase):
                 print(x)
                 print(x_tilde)
 
-            _, l_x_tilde = layers.discriminator(x_tilde)
+                _, l_x_tilde = layers.discriminator(x_tilde)
 
-            with tf.variable_scope(tf.get_variable_scope(), reuse=True):
                 # Generate reconstruction.
                 x_tilde_mean = layers.decoder(z_x_mean_IW)
                 print(x_tilde_mean)
@@ -255,7 +265,8 @@ class Model(model.GenerativeModelBase):
 
         # Calculate the losses specific to encoder, decoder, discriminator.
         # L_e = tf.clip_by_value(KL_loss + LL_loss, -100, 100)
-        L_e = tf.clip_by_value(-model.objective + LL_loss, -1000, 1000)
+        # L_e = tf.clip_by_value(-model.objective + LL_loss, -1000, 1000)
+        L_e = tf.clip_by_value(-model.objective, -10000, 10000)
         L_g = tf.clip_by_value(LL_loss + G_loss, -100, 100)
         L_d = tf.clip_by_value(D_loss, -100, 100)
 
@@ -273,7 +284,8 @@ class Model(model.GenerativeModelBase):
     def _build_apply_gradients(self, optimizers, gradients, global_step):
         operations = []
         for name, optimizer in zip(['encoder', 'decoder', 'discriminator'], optimizers):
-            if name != 'decoder':
+            # if name != 'decoder' and name != 'discriminator':  # Same as name == 'encoder'
+            if name != 'decoder':  # Same as name == 'encoder'
                 operations.append(optimizer.apply_gradients(gradients[name], global_step=global_step))
 
         return tf.group(*operations)
@@ -301,7 +313,7 @@ class Model(model.GenerativeModelBase):
             learning_rate[2]: d_learning_rate * utils.sigmoid(np.mean(d_fake), -0.5, 15),
         })
 
-    def encode_op(self, x, sample=False, with_variance=False):
+    def encode_op(self, x, sample=True, with_variance=False):
         model = self._model(x)
         if sample:
             return model.z_x
@@ -339,7 +351,7 @@ class Model(model.GenerativeModelBase):
             discrimination, lth_layer = layers.discriminator(x, width, height)
             return lth_layer
 
-    def reconstruct_op(self, x, sample=False, sample_times=1):
+    def reconstruct_op(self, x, sample=True, sample_times=30):
         model = self._model(x, sample=sample_times)
         if sample:
             return model.x_tilde
