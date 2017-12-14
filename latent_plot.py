@@ -12,7 +12,7 @@ from jernej_code_vae_gan.report import Report
 import jernej_code_vae_gan.other_util_plotting as util2
 
 from mcmc.util import plot, plot_save, plot_z
-from mcmc.mcmc2 import run_experiment, compare_vae_hmc_loss
+from mcmc.mcmc_jernej import run_experiment, compare_vae_hmc_loss
 
 sess = ed.get_session() # need to make sure tf and edward share the global session
 
