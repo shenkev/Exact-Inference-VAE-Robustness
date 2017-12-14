@@ -2,11 +2,11 @@ import numpy as np
 import tensorflow as tf
 
 # this is kind of hacky, model_class is the vae_gan class but its parent abstract-class is in the same folder
-from stolen_jernej_code_vae_gan import Model as model_class, utils
-from stolen_jernej_code_vae_gan.mnist import mnist_data
-from stolen_jernej_code_vae_gan.report import Report
-import stolen_jernej_code_vae_gan.other_util_plotting as util2
-from stolen_jernej_code_vae_gan.simple_classifier import Classifier as classifier_class
+from jernej_code_vae_gan import Model as model_class, utils
+from jernej_code_vae_gan.mnist import mnist_data
+from jernej_code_vae_gan.report import Report
+import jernej_code_vae_gan.other_util_plotting as util2
+from jernej_code_vae_gan.simple_classifier import Classifier as classifier_class
 
 """
     TO RUN: You need to download the trained model weights and put them in the /models folder
