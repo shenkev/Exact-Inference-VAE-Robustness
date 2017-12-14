@@ -1,5 +1,5 @@
 import numpy as np
-from stolen_jernej_code_vae_gan import utils
+from jernej_code_vae_gan import utils
 
 """
     List of variables required to run Jernej's code below
