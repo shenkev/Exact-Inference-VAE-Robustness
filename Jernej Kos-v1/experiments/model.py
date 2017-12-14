@@ -206,10 +206,11 @@ class ModelBase(object):
         dummy_placeholder = self._get_input_placeholder()
         self._model(dummy_placeholder)
 
-    def train(self, data_sets, epochs, checkpoint=None, checkpoint_every=1):
+    def train(self, data_sets, epochs, original_checkpoint=None, new_model_checkpoint=None, checkpoint_every=1):
         """Train the model."""
-        if not checkpoint:
-            checkpoint = self.get_model_filename()
+        if not new_model_checkpoint:
+            print("No checkpoint, using default file name:" + self.get_model_filename)
+            new_model_checkpoint = self.get_model_filename()
 
         # Detect the number of GPUs.
         num_gpus = self._get_num_gpus()
@@ -224,6 +225,11 @@ class ModelBase(object):
         total_batch = int(np.floor(self.examples_per_epoch / (self.batch_size * num_gpus)))
 
         saver = tf.train.Saver(variables)
+        
+        # Load the original weights first
+        if original_checkpoint is not None:
+            self.load(original_checkpoint)
+
         for epoch in tqdm.tqdm(range(epochs), desc='Epoch'):
             progress = tqdm.tqdm(total=total_batch, desc='Batch (loss=?.???)', leave=False)
             for i in range(total_batch):
@@ -257,9 +263,9 @@ class ModelBase(object):
 
             # Checkpoint model.
             if epoch % checkpoint_every == 0:
-                saver.save(self.session, checkpoint)
+                saver.save(self.session, new_model_checkpoint)
 
-        saver.save(self.session, checkpoint)
+        saver.save(self.session, new_model_checkpoint)
 
     def batch_apply(self, operation, feed_dict):
         """Runs on operation by splitting inputs into batches."""
@@ -378,11 +384,11 @@ class GenerativeModelBase(ModelBase):
     def _get_labels_placeholder(self, batches=1):
         return None
 
-    def encode_op(self, x, sample=False):
+    def encode_op(self, x, sample=True):
         """Return an operation for encoding an input into a latent representation."""
         raise NotImplementedError
 
-    def encode(self, x, sample=False):
+    def encode(self, x, sample=True):
         """Encode an input into a latent representation."""
         encoder_input, encoder_op = self._cache_op('encoder', self.encode_op, sample=sample)
         return self.batch_apply(encoder_op, feed_dict=self._set_training({encoder_input: x}, False))
@@ -396,11 +402,11 @@ class GenerativeModelBase(ModelBase):
         decoder_input, decoder_op = self._cache_op('decoder', self.decode_op, placeholder='latent')
         return self.batch_apply(decoder_op, feed_dict=self._set_training({decoder_input: z}, False))
 
-    def reconstruct_op(self, x, sample=False, sample_times=1):
+    def reconstruct_op(self, x, sample=False, sample_times=30):
         """Return an operation for reconstructing an input using the model."""
         raise NotImplementedError
 
-    def reconstruct(self, x, sample=False, sample_times=None):
+    def reconstruct(self, x, sample=True, sample_times=30): # HC: Changed to be default using sampling for now
         """Reconstruct an input using the model."""
         if sample_times is None:
             sample_times = self.defaults['reconstruction'].get('sampling', 0)
@@ -410,6 +416,9 @@ class GenerativeModelBase(ModelBase):
             else:
                 sample = False
                 sample_times = 1
+        else:
+            print("sample: {}".format(sample))
+            print("sample_times: {}".format(sample_times))
 
         reconstructor_input, reconstructor_op = self._cache_op(
             'reconstructor', self.reconstruct_op, sample=sample, sample_times=sample_times)
