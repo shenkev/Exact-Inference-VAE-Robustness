@@ -6,10 +6,10 @@ import edward as ed
 import pickle
 
 # this is kind of hacky, model_class is the vae_gan class but its parent abstract-class is in the same folder
-from jernej_code_vae_gan import Model as model_class, utils
-from jernej_code_vae_gan.mnist import mnist_data
-from jernej_code_vae_gan.report import Report
-import jernej_code_vae_gan.other_util_plotting as util2
+from stolen_jernej_code_vae_gan import Model as model_class, utils
+from stolen_jernej_code_vae_gan.mnist import mnist_data
+from stolen_jernej_code_vae_gan.report import Report
+import stolen_jernej_code_vae_gan.other_util_plotting as util2
 
 from mcmc.util import plot, plot_save
 from mcmc.mcmc2 import run_experiment, compare_vae_hmc_loss
